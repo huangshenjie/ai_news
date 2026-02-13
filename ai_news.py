@@ -1,11 +1,11 @@
 import requests
 import json
 from tavily import TavilyClient
-from google import genai  # 👈 注意这里：必须是新的官方库
+from google import genai
 from datetime import datetime
 
 # =========================================================
-# 🔴 请在此处填入你的 Key (保留双引号)
+# 🔴 核心配置区 (请保留你的 Key，不要动引号)
 # =========================================================
 WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=0ea95932-128f-47ca-bc26-0df9fbd41de0"
 TAVILY_API_KEY = "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"  # 在这里粘贴 Tavily Key
@@ -18,7 +18,7 @@ def get_realtime_news():
     try:
         # 搜索过去24小时的精准信息
         response = tavily.search(
-            query="OpenAI latest news, DeepSeek updates, Bytedance AI video model", 
+            query="OpenAI latest news, DeepSeek updates, Bytedance AI video model, China AI startup funding", 
             search_depth="advanced", 
             max_results=12,
             days=1
@@ -32,7 +32,6 @@ def ai_process_content(news_data):
     if not news_data: return None
     print("2. 正在调用 Gemini (新版 SDK) 进行重写...")
 
-    # 👇 核心修改：使用 Google 新版 Client 调用
     client = genai.Client(api_key=GEMINI_API_KEY)
     
     prompt = f"""
@@ -46,21 +45,32 @@ def ai_process_content(news_data):
     
     输出模板：
     ### 🤖 AI 全球情报 ({datetime.now().strftime('%Y-%m-%d')})
+    > 🧠 智能重写：Gemini 2.0 Flash
     
     1. **[标题]** ...
        🔗 [链接](url)
     """
     
     try:
-        # 👇 核心修改：使用 models.generate_content 方法
+        # 👇【核心修复】切换到 Gemini 2.0 Flash，这是目前公测最稳定快速的版本
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.0-flash", 
             contents=prompt
         )
         return response.text
     except Exception as e:
-        print(f"Gemini 生成失败: {e}")
-        return None
+        # 如果 2.0 也不行，打印出错误方便调试，并尝试 fallback
+        print(f"Gemini 2.0 生成失败: {e}")
+        try:
+            print("尝试回退到 gemini-1.5-pro...")
+            response = client.models.generate_content(
+                model="gemini-1.5-pro",
+                contents=prompt
+            )
+            return response.text
+        except Exception as e2:
+            print(f"所有模型尝试均失败: {e2}")
+            return None
 
 def push_wechat(content):
     if not content: return
