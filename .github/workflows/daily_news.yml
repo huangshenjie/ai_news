@@ -2,7 +2,6 @@ name: Daily AI News Push
 
 on:
   schedule:
-    # 每天北京时间 08:30
     - cron: '30 0 * * *'
   workflow_dispatch:
 
@@ -14,13 +13,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 升级 Python 到 3.11 以避免过时警告
+      # 强制使用 Python 3.11 (解决旧版本警告)
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      # 安装最新的 Google 官方库 google-genai
+      # 安装 Google 最新官方 SDK (google-genai)
       - name: Install dependencies
         run: |
           pip install requests tavily-python google-genai
