@@ -2,9 +2,9 @@ name: Daily AI News Push
 
 on:
   schedule:
-    # 每天北京时间 08:30 (UTC 00:30)
+    # 每天北京时间 08:30
     - cron: '30 0 * * *'
-  workflow_dispatch: # 允许手动点按钮测试
+  workflow_dispatch:
 
 jobs:
   build:
@@ -14,15 +14,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # 升级 Python 到 3.11 以避免过时警告
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.11'
 
-      # 安装所有必要的库：请求、RSS解析、搜索、Google AI
+      # 安装最新的 Google 官方库 google-genai
       - name: Install dependencies
         run: |
-          pip install requests feedparser tavily-python google-generativeai
+          pip install requests tavily-python google-genai
 
       - name: Run script
         run: python ai_news.py
