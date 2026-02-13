@@ -5,7 +5,7 @@ import datetime
 # =========================================================
 # 【请在此处粘贴你的 Webhook URL】
 # 格式如: https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxxxxx
-WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=7258cb28-bba6-46c7-9993-19c47b6e8b69"
+WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=0ea95932-128f-47ca-bc26-0df9fbd41de0"
 # =========================================================
 
 def get_ai_news():
@@ -52,4 +52,5 @@ def push_to_weixin(text):
 
 if __name__ == "__main__":
     news_content = get_ai_news()
+
     push_to_weixin(news_content)
