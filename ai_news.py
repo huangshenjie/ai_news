@@ -1,5 +1,6 @@
 import requests
 import json
+import time
 from tavily import TavilyClient
 from datetime import datetime
 
@@ -15,11 +16,10 @@ def get_realtime_news():
     print("1. 正在全网搜索 AI 资讯...")
     tavily = TavilyClient(api_key=TAVILY_API_KEY)
     try:
-        # 搜索最近 24 小时的 AI 动态
         response = tavily.search(
             query="OpenAI latest news, DeepSeek updates, Bytedance AI video model, China AI startup funding", 
             search_depth="advanced", 
-            max_results=12,
+            max_results=10,
             days=1
         )
         return response.get('results', [])
@@ -27,67 +27,86 @@ def get_realtime_news():
         print(f"搜索失败: {e}")
         return []
 
-def call_gemini_api(prompt):
+def call_gemini_with_fallback(prompt):
     """
-    使用纯 HTTP 请求调用 Gemini API，绕过 SDK 版本问题。
-    使用 gemini-1.5-flash 模型，速度快且免费额度高。
+    智能轮询：依次尝试不同的模型名称，直到成功。
+    解决了 404 (找不到模型) 和 429 (额度超限) 的问题。
     """
-    print("2. 正在调用 Gemini API (HTTP) ...")
+    # 备选模型列表（按优先级排序）
+    # 1.5-flash-latest: 通常是最新的稳定版
+    # 1.5-flash-001: 具体的版本号，最保险
+    # 1.5-pro: 备用
+    # gemini-pro: 老版本，作为最后的底线
+    models_to_try = [
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash-001",
+        "gemini-1.5-flash",
+        "gemini-1.5-pro-latest",
+        "gemini-pro"
+    ]
     
-    # API 端点
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    print("2. 正在调用 Gemini API (智能轮询模式)...")
     
-    # 请求体
-    payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
-    }
-    
-    try:
-        response = requests.post(url, headers={'Content-Type': 'application/json'}, json=payload)
+    for model_name in models_to_try:
+        print(f"   Trying model: {model_name} ...")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
         
-        # 检查是否成功
-        if response.status_code == 200:
-            result = response.json()
-            # 提取生成的文本
-            return result['candidates'][0]['content']['parts'][0]['text']
-        elif response.status_code == 429:
-            print("❌ 错误：请求过于频繁 (Quota Exceeded)，请稍后再试。")
-            return None
-        else:
-            print(f"❌ Gemini API 调用失败: {response.status_code} - {response.text}")
-            return None
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}]
+        }
+        
+        try:
+            response = requests.post(url, headers={'Content-Type': 'application/json'}, json=payload)
             
-    except Exception as e:
-        print(f"网络请求异常: {e}")
-        return None
+            if response.status_code == 200:
+                print(f"   ✅ 成功连接模型: {model_name}")
+                result = response.json()
+                return result['candidates'][0]['content']['parts'][0]['text']
+            
+            elif response.status_code == 404:
+                print(f"   ❌ 模型未找到 (404)，尝试下一个...")
+                continue # 试下一个
+            
+            elif response.status_code == 429:
+                print(f"   ⚠️ 模型额度耗尽 (429)，尝试下一个...")
+                continue # 试下一个
+                
+            else:
+                print(f"   ❌ 未知错误 {response.status_code}: {response.text}")
+                continue
+                
+        except Exception as e:
+            print(f"   网络异常: {e}")
+            continue
+
+    return None
 
 def ai_process_content(news_data):
     if not news_data: return None
 
-    # 构造提示词
     prompt = f"""
     你是一名 AI 情报专家。请根据以下搜索结果整理为中文日报：
     {json.dumps(news_data)}
     
     要求：
-    1. 必须使用中文输出。
-    2. 筛选 10 条最有价值的新闻（去重）。
+    1. 必须中文。
+    2. 筛选 8-10 条核心资讯。
     3. 格式：Markdown 列表，包含 [来源]、标题、链接。
-    4. 标题要清晰简练，概括核心事实。
     
     输出模板：
     ### 🤖 AI 全球情报 ({datetime.now().strftime('%Y-%m-%d')})
     
-    1. **[标签] 标题**
+    1. **[标题]** ...
        🔗 [链接](url)
     """
     
-    return call_gemini_api(prompt)
+    # 使用智能轮询函数
+    return call_gemini_with_fallback(prompt)
 
 def push_wechat(content):
-    if not content: return
+    if not content: 
+        print("内容为空，无法推送")
+        return
     print("3. 正在推送...")
     headers = {"Content-Type": "application/json"}
     data = {"msgtype": "markdown", "markdown": {"content": content}}
