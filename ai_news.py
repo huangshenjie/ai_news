@@ -1,11 +1,10 @@
 import requests
 import json
 from tavily import TavilyClient
-from google import genai
 from datetime import datetime
 
 # =========================================================
-# 🔴 核心配置区 (请保留你的 Key，不要动引号)
+# 🔴 核心配置区 (务必填入 Key)
 # =========================================================
 WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=0ea95932-128f-47ca-bc26-0df9fbd41de0"
 TAVILY_API_KEY = "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"  # 在这里粘贴 Tavily Key
@@ -16,7 +15,7 @@ def get_realtime_news():
     print("1. 正在全网搜索 AI 资讯...")
     tavily = TavilyClient(api_key=TAVILY_API_KEY)
     try:
-        # 搜索过去24小时的精准信息
+        # 搜索最近 24 小时的 AI 动态
         response = tavily.search(
             query="OpenAI latest news, DeepSeek updates, Bytedance AI video model, China AI startup funding", 
             search_depth="advanced", 
@@ -28,49 +27,64 @@ def get_realtime_news():
         print(f"搜索失败: {e}")
         return []
 
+def call_gemini_api(prompt):
+    """
+    使用纯 HTTP 请求调用 Gemini API，绕过 SDK 版本问题。
+    使用 gemini-1.5-flash 模型，速度快且免费额度高。
+    """
+    print("2. 正在调用 Gemini API (HTTP) ...")
+    
+    # API 端点
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    
+    # 请求体
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
+    
+    try:
+        response = requests.post(url, headers={'Content-Type': 'application/json'}, json=payload)
+        
+        # 检查是否成功
+        if response.status_code == 200:
+            result = response.json()
+            # 提取生成的文本
+            return result['candidates'][0]['content']['parts'][0]['text']
+        elif response.status_code == 429:
+            print("❌ 错误：请求过于频繁 (Quota Exceeded)，请稍后再试。")
+            return None
+        else:
+            print(f"❌ Gemini API 调用失败: {response.status_code} - {response.text}")
+            return None
+            
+    except Exception as e:
+        print(f"网络请求异常: {e}")
+        return None
+
 def ai_process_content(news_data):
     if not news_data: return None
-    print("2. 正在调用 Gemini (新版 SDK) 进行重写...")
 
-    client = genai.Client(api_key=GEMINI_API_KEY)
-    
+    # 构造提示词
     prompt = f"""
-    作为 AI 情报专家，请将以下搜索结果整理为中文日报：
+    你是一名 AI 情报专家。请根据以下搜索结果整理为中文日报：
     {json.dumps(news_data)}
     
     要求：
-    1. 必须使用中文。
-    2. 筛选 10 条最有价值的新闻。
+    1. 必须使用中文输出。
+    2. 筛选 10 条最有价值的新闻（去重）。
     3. 格式：Markdown 列表，包含 [来源]、标题、链接。
+    4. 标题要清晰简练，概括核心事实。
     
     输出模板：
     ### 🤖 AI 全球情报 ({datetime.now().strftime('%Y-%m-%d')})
-    > 🧠 智能重写：Gemini 2.0 Flash
     
-    1. **[标题]** ...
+    1. **[标签] 标题**
        🔗 [链接](url)
     """
     
-    try:
-        # 👇【核心修复】切换到 Gemini 2.0 Flash，这是目前公测最稳定快速的版本
-        response = client.models.generate_content(
-            model="gemini-2.0-flash", 
-            contents=prompt
-        )
-        return response.text
-    except Exception as e:
-        # 如果 2.0 也不行，打印出错误方便调试，并尝试 fallback
-        print(f"Gemini 2.0 生成失败: {e}")
-        try:
-            print("尝试回退到 gemini-1.5-pro...")
-            response = client.models.generate_content(
-                model="gemini-1.5-pro",
-                contents=prompt
-            )
-            return response.text
-        except Exception as e2:
-            print(f"所有模型尝试均失败: {e2}")
-            return None
+    return call_gemini_api(prompt)
 
 def push_wechat(content):
     if not content: return
