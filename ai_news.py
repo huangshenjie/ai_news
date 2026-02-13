@@ -1,19 +1,18 @@
 import requests
 import json
-import time
 from tavily import TavilyClient
 from datetime import datetime
 
 # =========================================================
-# 🔴 务必填入你刚刚新建项目生成的 Key
+# 🔴 核心配置区 (请填入你的 Key)
 # =========================================================
 WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=0ea95932-128f-47ca-bc26-0df9fbd41de0"
 TAVILY_API_KEY = "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"  # 在这里粘贴 Tavily Key
-GEMINI_API_KEY = "AIzaSyAzPYpVuOZYStxlxTdvSAewCTaSpIiRffs"   # 在这里粘贴你刚才复制的 Gemini Key
+DEEPSEEK_API_KEY = "sk-gvvsglcyhujlvprlryxtwduxvbgwfyzqngzqesyvwvucjnyw" # 在此粘贴刚刚复制的 DeepSeek Key
 # =========================================================
 
 def get_realtime_news():
-    print("1. 正在全网搜索 AI 资讯...")
+    print("1. 正在全网搜索 AI 资讯 (Tavily)...")
     tavily = TavilyClient(api_key=TAVILY_API_KEY)
     try:
         response = tavily.search(
@@ -27,53 +26,71 @@ def get_realtime_news():
         print(f"搜索失败: {e}")
         return []
 
-def call_gemini_simple(prompt):
+def call_deepseek(prompt):
     """
-    使用最基础的 HTTP 请求调用 gemini-1.5-flash。
-    新项目的 Key 一定支持这个模型。
+    使用 DeepSeek V3 (硅基流动) 进行智能写作。
+    无需代理，国内直连，速度快。
     """
-    print("2. 正在调用 Gemini API...")
+    print("2. 正在调用 DeepSeek V3...")
     
-    # 强制指定版本号，避免歧义
-    model_name = "gemini-1.5-flash"
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+    url = "https://api.siliconflow.cn/v1/chat/completions"
+    
+    headers = {
+        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+        "Content-Type": "application/json"
+    }
     
     payload = {
-        "contents": [{"parts": [{"text": prompt}]}]
+        "model": "deepseek-ai/DeepSeek-V3", # 使用满血版 V3
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "stream": False,
+        "temperature": 0.7
     }
     
     try:
-        response = requests.post(url, headers={'Content-Type': 'application/json'}, json=payload)
+        response = requests.post(url, headers=headers, json=payload)
         
         if response.status_code == 200:
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
+            result = response.json()
+            return result['choices'][0]['message']['content']
         else:
-            print(f"❌ 调用失败 (Code {response.status_code}): {response.text}")
+            print(f"❌ DeepSeek 调用失败: {response.status_code} - {response.text}")
             return None
             
     except Exception as e:
-        print(f"网络异常: {e}")
+        print(f"网络请求异常: {e}")
         return None
 
 def ai_process_content(news_data):
     if not news_data: return None
 
     prompt = f"""
-    你是一名 AI 情报专家。请根据以下搜索结果整理为中文日报：
-    {json.dumps(news_data)}
+    你是一名专业、犀利的 AI 行业情报官。请根据以下原始搜索数据，为我撰写一份【中文日报】。
     
-    要求：
-    1. 必须中文。
-    2. 筛选 8 条核心资讯。
-    3. 格式：Markdown 列表，包含 [来源]、标题、链接。
+    原始数据：
+    {json.dumps(news_data, ensure_ascii=False)}
+    
+    撰写要求：
+    1. **只说人话**：标题要简练、有力，拒绝营销号废话。
+    2. **筛选精华**：只保留 8-10 条最有价值的新闻（去重）。
+    3. **必须包含**：OpenAI 动态、国产大模型（DeepSeek/字节/阿里）进展。
+    4. **格式规范**：Markdown 列表，格式为 `1. **[标签] 标题** 🔗 [链接](url)`。
     
     输出模板：
-    ### 🤖 AI 全球情报 ({datetime.now().strftime('%Y-%m-%d')})
+    ### 🚀 AI 每日内参 ({datetime.now().strftime('%Y-%m-%d')})
+    > 🧠 智能驱动：DeepSeek V3 | 🌍 实时信源：Tavily
     
-    1. **[标题]** ...
-       🔗 [链接](url)
+    1. **[重磅]** ...
+       🔗 [原文](url)
+    
+    ...
+    
+    ---
+    **💡 辣评**：(一句话总结今日趋势)
     """
-    return call_gemini_simple(prompt)
+    return call_deepseek(prompt)
 
 def push_wechat(content):
     if not content: return
