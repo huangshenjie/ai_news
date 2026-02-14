@@ -15,7 +15,7 @@ DEEPSEEK_API_KEY = "sk-gvvsglcyhujlvprlryxtwduxvbgwfyzqngzqesyvwvucjnyw"
 WECOM_WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=0ea95932-128f-47ca-bc26-0df9fbd41de0"
 
 # [通道B] 飞书 Webhook (记得在飞书后台设关键词 "AI")
-FEISHU_WEBHOOK_URL = "https://open.feishu.cn/open-apis/bot/v2/hook/323bfb85-211d-4710-824b-beb962b460a1"
+FEISHU_WEBHOOK_URL = "https://open.feishu.cn/open-apis/bot/v2/hook/54e2a16a-8409-46c7-bd62-a169bc3e063f"
 # =========================================================
 
 def get_realtime_news():
@@ -185,3 +185,4 @@ if __name__ == "__main__":
         push_feishu(text)
     else:
         print("无数据")
+
