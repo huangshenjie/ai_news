@@ -6,19 +6,14 @@ from tavily import TavilyClient
 from datetime import datetime, timedelta, timezone
 
 # =========================================================
-# 🔴 核心配置区 (已修复空值陷阱)
+# 🔴 核心配置区 (支持 本地硬编码 + GitHub Secrets 双模式)
 # =========================================================
-# 技巧：使用 'or' 关键字。
-# 逻辑：尝试读取环境变量 -> 如果是空的(None或"") -> 强制使用后面的硬编码 Key
-# =========================================================
-
 TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY") or "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"
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY") or "sk-gvvsglcyhujlvprlryxtwduxvbgwfyzqngzqesyvwvucjnyw"
 BOCHA_API_KEY = os.environ.get("BOCHA_API_KEY") or "sk-2fae396b559249da8dab4fe7de1ae125"
 
 WECOM_WEBHOOK_URL = os.environ.get("WECOM_WEBHOOK_URL") or "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=0ea95932-128f-47ca-bc26-0df9fbd41de0"
 FEISHU_WEBHOOK_URL = os.environ.get("FEISHU_WEBHOOK_URL") or "https://open.feishu.cn/open-apis/bot/v2/hook/54e2a16a-8409-46c7-bd62-a169bc3e063f"
-
 # =========================================================
 
 def get_beijing_time():
@@ -27,20 +22,21 @@ def get_beijing_time():
     return utc_now + timedelta(hours=8)
 
 # ---------------------------------------------------------
-# 🌍 数据源 A: Tavily (国际视野)
+# 🌍 数据源 A: Tavily (国际视野 - 扩容版)
 # ---------------------------------------------------------
 def get_tavily_data():
     print("1. 正在全网搜索 (Tavily - 国际视野)...")
     
-    # 检查 Key 是否包含占位符
     if not TAVILY_API_KEY or "在此粘贴" in TAVILY_API_KEY:
-        print(f"⚠️ Tavily Key 未配置 (当前值: {TAVILY_API_KEY[:5]}...)，跳过")
+        print("⚠️ Tavily Key 未配置，跳过")
         return []
         
     tavily = TavilyClient(api_key=TAVILY_API_KEY)
-    query = "AI Artificial Intelligence news latest trends OpenAI DeepSeek Google Nvidia updates"
+    # 优化：关键词增加 'impact', 'price', 'release' 等词，引导搜出具体实锤新闻
+    query = "AI Artificial Intelligence news impact pricing release OpenAI DeepSeek Nvidia Google business trends"
     try:
-        response = tavily.search(query=query, search_depth="advanced", max_results=15, days=1)
+        # 🔥 修改点 1：max_results 提升到 20
+        response = tavily.search(query=query, search_depth="advanced", max_results=20, days=1)
         results = response.get('results', [])
         print(f"✅ Tavily 获取成功: {len(results)} 条")
         return results
@@ -49,13 +45,13 @@ def get_tavily_data():
         return []
 
 # ---------------------------------------------------------
-# 🇨🇳 数据源 B: 博查 Bocha (国内精准 - 结构修复版)
+# 🇨🇳 数据源 B: 博查 Bocha (国内视野 - 扩容版)
 # ---------------------------------------------------------
 def get_bocha_data():
     print("2. 正在尝试博查搜索 (Bocha - 国内视野)...")
     
     if not BOCHA_API_KEY or "在此粘贴" in BOCHA_API_KEY:
-        print(f"⚠️ Bocha Key 未配置 (当前值: {BOCHA_API_KEY[:5]}...)，跳过")
+        print("⚠️ Bocha Key 未配置，跳过")
         return [] 
         
     url = "https://api.bochaai.com/v1/web-search"
@@ -64,48 +60,43 @@ def get_bocha_data():
         "Content-Type": "application/json"
     }
     payload = {
-        "query": "DeepSeek 商业化落地 最新进展 OR OpenAI Sora 最新消息 site:36kr.com OR site:qbitai.com",
+        "query": "DeepSeek 商业化 价格战 算力成本 OpenAI 竞争 site:36kr.com OR site:qbitai.com OR site:jiqizhixin.com",
         "freshness": "oneDay",
-        "count": 10
+        # 🔥 修改点 2：count 提升到 20
+        "count": 20
     }
     
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=10)
-        
         if response.status_code == 200:
             data = response.json()
-            
-            # 路径：data -> webPages -> value
             web_pages = data.get('data', {}).get('webPages', {})
             items_list = web_pages.get('value', [])
             
             results = []
             for item in items_list:
-                results.append({
-                    "title": item.get('name'),
-                    "url": item.get('url'),
-                    "content": item.get('snippet')
-                })
-            
+                # 简单的清洗，去掉太短的标题
+                if len(item.get('name', '')) > 5:
+                    results.append({
+                        "title": item.get('name'),
+                        "url": item.get('url'),
+                        "content": item.get('snippet')
+                    })
             print(f"✅ Bocha 获取成功: {len(results)} 条")
             return results
         else:
-            print(f"❌ Bocha API 错误: {response.status_code} - {response.text}")
+            print(f"❌ Bocha API 错误: {response.status_code}")
             return []
-            
     except Exception as e:
         print(f"❌ Bocha 请求异常: {e}")
         return []
 
 # ---------------------------------------------------------
-# 🛡️ 数据源 C: RSS 兜底 (36Kr/IT之家)
+# 🛡️ 数据源 C: RSS 兜底
 # ---------------------------------------------------------
 def get_rss_data():
     print("🔄 正在启动 RSS 兜底机制 (36Kr & IT之家)...")
-    rss_sources = [
-        "https://36kr.com/feed",
-        "https://www.ithome.com/rss/"
-    ]
+    rss_sources = ["https://36kr.com/feed", "https://www.ithome.com/rss/"]
     results = []
     try:
         for rss_url in rss_sources:
@@ -128,19 +119,16 @@ def get_rss_data():
 def get_realtime_news():
     all_news = []
     
-    # 1. Tavily
-    tavily_data = get_tavily_data()
-    all_news.extend(tavily_data)
+    # 1. 获取 Tavily (20条)
+    all_news.extend(get_tavily_data())
     
-    # 2. Bocha
-    bocha_data = get_bocha_data()
-    all_news.extend(bocha_data)
+    # 2. 获取 Bocha (20条)
+    all_news.extend(get_bocha_data())
     
-    # 3. 兜底判定
+    # 3. 只有当两者加起来都很少时，才用 RSS
     if len(all_news) < 5:
-        print("🛡️ 检测到 API 数据不足，强制启动 RSS 替补上场...")
-        rss_data = get_rss_data()
-        all_news.extend(rss_data)
+        print("🛡️ API 数据不足，强制启动 RSS 补充...")
+        all_news.extend(get_rss_data())
         
     # 去重
     seen_urls = set()
@@ -155,11 +143,10 @@ def get_realtime_news():
     return unique_news
 
 # ---------------------------------------------------------
-# 🧠 DeepSeek 思考与清洗
+# 🧠 DeepSeek 思考与清洗 (Prompt 大升级)
 # ---------------------------------------------------------
 def call_deepseek(prompt):
     print("3. 正在调用 DeepSeek V3 进行深度分析与排序...")
-    
     if not DEEPSEEK_API_KEY or "在此粘贴" in DEEPSEEK_API_KEY:
         print("❌ DeepSeek Key 未配置")
         return None
@@ -188,34 +175,49 @@ def ai_process_content(news_data):
     if not news_data: return None
     
     beijing_date = get_beijing_time().strftime('%Y-%m-%d')
-    data_str = json.dumps(news_data[:40], ensure_ascii=False)
+    # 增加投喂量，给 DeepSeek 更多素材
+    data_str = json.dumps(news_data[:50], ensure_ascii=False)
 
+    # 🔥 修改点 3：Prompt 究极进化版
     prompt = f"""
-    你是一名顶级 AI 战略顾问。这里有来自全球 ({len(news_data)}条) 关于 AI、OpenAI、DeepSeek 的最新混合资讯。
-    
-    🔥 **你的任务：**
-    1. **去重与清洗**：合并相似内容，剔除广告。
-    2. **热门排序**：根据【行业影响力】和【商业价值】进行降序排列。
-    3. **输出数量**：**必须输出 20 条以上** 的核心情报。
-    
-    🔥 **输出格式要求**：
-    ### 🚀 AI 全球情报内参 ({beijing_date})
-    > 🧠 智能驱动：DeepSeek V3 | 🌍 信源：Tavily + Bocha + RSS
+    你是一名残酷、挑剔且极具商业洞察力的科技情报分析师。这里有 {len(news_data)} 条关于 AI 的原始资讯。
+    请从中提炼出 **20 条** 最有价值的情报，撰写一份《AI 全球实战内参》。
+
+    **❌ 严禁出现的问题（出现则不及格）：**
+    1. **标题空洞：** 严禁使用“XX计划启动”、“XX发布新功能”这种正确的废话。
+    2. **标签笼统：** 严禁使用 [市场]、[技术] 这种大词。
+    3. **丢失链接：** 每一条新闻必须附带原始链接。
+
+    **✅ 必须执行的标准：**
+    1. **标题信息量爆炸：** 标题必须包含【谁(Who) + 做了什么(Action) + 具体数据/后果(Result)】。
+       - *反例*：太空数据中心计划启动，应对 AI 高能耗挑战。
+       - *正例*：**Lomen 启动首个太空数据中心，利用太阳能降低 40% AI 训练成本。**
+    2. **标签精准犀利：** 使用具体领域的细分标签。
+       - *正例*：**[算力降本]**、**[端侧模型]**、**[监管重拳]**、**[人才挖角]**。
+    3. **格式严格统一：** 必须在标题下方另起一行放链接，格式为 `🔗 [媒体名](url)`。
+
+    **🔥 输出格式模板（请严格模仿）：**
+
+    ### 🚀 AI 全球实战内参 ({beijing_date})
+    > 🧠 智能驱动：DeepSeek V3 | 🌍 覆盖信源：Tavily (国际) + Bocha (国内)
     
     #### ⭐ 顶级重磅 (Top 3)
-    1. **[标签] 标题...**
+    1. **[芯片封锁] 英伟达特供版 H20 芯片被曝停供，国内大模型训练成本或上涨 30%**
+       🔗 [36氪](https://...)
+    2. **[模型价格战] DeepSeek API 降价 50% 倒逼 OpenAI 跟进，每百万 Token 跌破 1 美元**
+       🔗 [TechCrunch](https://...)
     ...
     
-    #### 📰 行业必读 (Top 4-20+)
-    4. **[标签] ...**
+    #### 📰 行业必读 (Top 4-20)
+    4. **[融资风向] 只做 AI 应用的 Jasper 估值缩水 40%，SaaS 壳公司泡沫破裂**
+       🔗 [TheInfo](https://...)
     ...
-    20. **[标签] ...**
     
     ---
     #### 🔭 深度战略研判
-    ...
+    （用一段话犀利点评今日的行业风向，指出一个被忽视的搞钱机会）
     
-    **原始数据：**
+    **原始数据投喂：**
     {data_str}
     """
     return call_deepseek(prompt)
@@ -226,30 +228,25 @@ def ai_process_content(news_data):
 def push_wechat(content):
     if not content or not WECOM_WEBHOOK_URL or "在此粘贴" in WECOM_WEBHOOK_URL: return
     print("4.1 推送至企微...")
-    
     if len(content.encode('utf-8')) > 4000:
         part1 = content[:3000] + "\n...(下接第二条)..."
         part2 = "...(接上条)...\n" + content[3000:]
         requests.post(WECOM_WEBHOOK_URL, json={"msgtype": "markdown", "markdown": {"content": part1}})
         requests.post(WECOM_WEBHOOK_URL, json={"msgtype": "markdown", "markdown": {"content": part2}})
     else:
-        headers = {"Content-Type": "application/json"}
-        data = {"msgtype": "markdown", "markdown": {"content": content}}
-        try: requests.post(WECOM_WEBHOOK_URL, headers=headers, data=json.dumps(data))
-        except: pass
+        requests.post(WECOM_WEBHOOK_URL, json={"msgtype": "markdown", "markdown": {"content": content}})
 
 def push_feishu(content):
     if not content or not FEISHU_WEBHOOK_URL or "在此粘贴" in FEISHU_WEBHOOK_URL: return
     print("4.2 推送至飞书...")
     current_time = get_beijing_time().strftime('%Y-%m-%d %H:%M')
-    
     payload = {
         "msg_type": "interactive",
         "card": {
             "config": {"wide_screen_mode": True},
             "header": {
                 "template": "blue",
-                "title": {"content": "🚀 AI 全球情报内参 (Max版)", "tag": "plain_text"}
+                "title": {"content": "🚀 AI 全球实战内参", "tag": "plain_text"}
             },
             "elements": [
                 {"tag": "markdown", "content": content},
@@ -257,24 +254,21 @@ def push_feishu(content):
             ]
         }
     }
-    try: requests.post(FEISHU_WEBHOOK_URL, json=payload)
-    except: pass
+    requests.post(FEISHU_WEBHOOK_URL, json=payload)
 
 # ---------------------------------------------------------
 # 🚀 主程序入口
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    print("🚀 启动 Max 版情报系统...")
-    
+    print("🚀 启动 Pro Max 版情报系统...")
     raw_data = get_realtime_news()
-    
     if raw_data:
         final_text = ai_process_content(raw_data)
         if final_text:
             push_wechat(final_text)
             push_feishu(final_text)
-            print("✅ 任务全部完成")
+            print("✅ 任务完成")
         else:
-            print("⚠️ DeepSeek 内容生成为空")
+            print("⚠️ DeepSeek 生成为空")
     else:
-        print("❌ 严重错误：全网无数据")
+        print("❌ 无数据")
