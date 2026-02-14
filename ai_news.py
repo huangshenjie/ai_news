@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 # =========================================================
 # 在本地测试时，如果没有设置环境变量，请手动将 os.environ.get(...) 替换为具体的 Key
 TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "")
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-gvvsglcyhujlvprlryxtwduxvbgwfyzqngzqesyvwvucjnyw")
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 WECOM_WEBHOOK_URL = os.environ.get("WECOM_WEBHOOK_URL", "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=0ea95932-128f-47ca-bc26-0df9fbd41de0")
 FEISHU_WEBHOOK_URL = os.environ.get("FEISHU_WEBHOOK_URL", "https://open.feishu.cn/open-apis/bot/v2/hook/54e2a16a-8409-46c7-bd62-a169bc3e063f")
 
@@ -255,3 +255,4 @@ if __name__ == "__main__":
             print("⚠️ DeepSeek 生成内容为空")
     else:
         print("⚠️ 未获取到任何有效新闻数据")
+
