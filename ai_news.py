@@ -4,18 +4,17 @@ from tavily import TavilyClient
 from datetime import datetime
 
 # =========================================================
-# 🔴 核心配置区 (请填入你的 Key)
+# 🔴 核心配置区 (请务必填入 Key，不要留空，否则会报错)
 # =========================================================
-# 1. API Keys
-TAVILY_API_KEY = "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"  # 在这里粘贴 Tavily Key
-DEEPSEEK_API_KEY = "sk-gvvsglcyhujlvprlryxtwduxvbgwfyzqngzqesyvwvucjnyw" # 在此粘贴刚刚复制的 DeepSeek Key
+# 1. 搜索与 AI Key
+TAVILY_API_KEY = "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"
+DEEPSEEK_API_KEY = "sk-gvvsglcyhujlvprlryxtwduxvbgwfyzqngzqesyvwvucjnyw" 
 
 # 2. 推送通道配置
-# 企业微信 Webhook (如果不需要请留空)
-WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=0ea95932-128f-47ca-bc26-0df9fbd41de0"
+# [通道A] 企业微信 Webhook (修复点：必须定义这个变量)
+WECOM_WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=0ea95932-128f-47ca-bc26-0df9fbd41de0"
 
-# 飞书 Webhook (🔥 新增)
-# 注意：在飞书机器人安全设置里，必须添加关键词 "AI"
+# [通道B] 飞书 Webhook (记得在飞书后台设关键词 "AI")
 FEISHU_WEBHOOK_URL = "https://open.feishu.cn/open-apis/bot/v2/hook/323bfb85-211d-4710-824b-beb962b460a1"
 # =========================================================
 
@@ -101,22 +100,27 @@ def ai_process_content(news_data):
     
     ---
     #### 🔭 深度战略研判
-    * **⚡ 行业变局**：(例如：开源模型正在倒逼闭源厂商降价，模型护城河正在从参数量转向应用生态...)
-    * **📈 崛起风口**：(例如：AI 视频生成正在爆发，短剧和广告行业将迎来洗牌...)
-    * **💰 落地机会**：(例如：利用长上下文窗口进行法律/医疗文档的自动化处理是当前蓝海...)
+    * **⚡ 行业变局**：...
+    * **📈 崛起风口**：...
+    * **💰 落地机会**：...
     
     *(AI总结，仅供参考)*
     """
     return call_deepseek(prompt)
 
-# === 通道 1: 企业微信 ===
+# === 通道 1: 企业微信 (已修复变量名问题) ===
 def push_wechat(content):
-    if not content or not WECOM_WEBHOOK_URL: 
-        print("企业微信 Webhook 为空，跳过推送。")
+    # 这里加了一个判断，防止变量不存在导致报错
+    try:
+        if not content or not WECOM_WEBHOOK_URL: 
+            print("⚠️ 企业微信 Webhook 未配置或内容为空，跳过。")
+            return
+    except NameError:
+        print("❌ 错误：WECOM_WEBHOOK_URL 变量未定义，请在代码顶部配置区添加。")
         return
+
     print("3.1 正在推送至企业微信...")
     
-    # 截断保护
     if len(content.encode('utf-8')) > 4000:
         content = content[:3000] + "\n\n...(内容过长，请点击链接查看更多)... \n*(AI总结，仅供参考)*"
     
@@ -131,47 +135,33 @@ def push_wechat(content):
 
 # === 通道 2: 飞书 (Lark) ===
 def push_feishu(content):
-    if not content or not FEISHU_WEBHOOK_URL: 
-        print("飞书 Webhook 为空，跳过推送。")
+    try:
+        if not content or not FEISHU_WEBHOOK_URL: 
+            print("⚠️ 飞书 Webhook 未配置或内容为空，跳过。")
+            return
+    except NameError:
+        print("❌ 错误：FEISHU_WEBHOOK_URL 变量未定义。")
         return
+
     print("3.2 正在推送至飞书...")
 
-    # 飞书使用的是“富文本卡片消息”，体验比纯 Markdown 更好
-    # 我们把 DeepSeek 的 Markdown 内容封装进卡片里
-    
-    # 截断保护 (飞书限制稍宽，但也做一下保护)
-    if len(content.encode('utf-8')) > 30000: # 飞书限制很大，这里主要是为了防止极端的超长文本
+    if len(content.encode('utf-8')) > 30000:
          content = content[:10000] + "\n...(内容过长截断)..."
 
     headers = {"Content-Type": "application/json"}
-    
-    # 构造飞书卡片 JSON 结构
     payload = {
         "msg_type": "interactive",
         "card": {
-            "config": {
-                "wide_screen_mode": True
-            },
+            "config": {"wide_screen_mode": True},
             "header": {
-                "template": "blue", # 标题颜色：蓝色
-                "title": {
-                    "content": "🚀 AI 全球情报内参",
-                    "tag": "plain_text"
-                }
+                "template": "blue",
+                "title": {"content": "🚀 AI 全球情报内参", "tag": "plain_text"}
             },
             "elements": [
-                {
-                    "tag": "markdown",
-                    "content": content # 直接把 DeepSeek 生成的 Markdown 塞进去，飞书支持渲染
-                },
+                {"tag": "markdown", "content": content},
                 {
                     "tag": "note",
-                    "elements": [
-                        {
-                            "tag": "plain_text",
-                            "content": f"更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-                        }
-                    ]
+                    "elements": [{"tag": "plain_text", "content": f"更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}"}]
                 }
             ]
         }
@@ -179,11 +169,10 @@ def push_feishu(content):
 
     try:
         res = requests.post(FEISHU_WEBHOOK_URL, headers=headers, data=json.dumps(payload))
-        result = res.json()
-        if result.get("code") == 0:
+        if res.json().get("code") == 0:
             print("✅ 飞书推送完成")
         else:
-            print(f"❌ 飞书推送失败: {result}")
+            print(f"❌ 飞书推送失败: {res.json()}")
     except Exception as e:
         print(f"❌ 飞书网络异常: {e}")
 
