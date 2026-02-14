@@ -2,9 +2,7 @@ name: Daily AI News
 
 on:
   schedule:
-    # 北京时间每天 08:30 运行
     - cron: '30 0 * * *'
-  # 允许手动触发
   workflow_dispatch:
 
 jobs:
@@ -21,12 +19,17 @@ jobs:
         python-version: '3.11'
         cache: 'pip'
 
-    # 关键修改：确保安装了 feedparser
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # 直接运行，无需 env，因为 Key 已经写在代码里了
     - name: Run AI News Script
+      env:
+        # 传递所有 Secrets
+        TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+        DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        BOCHA_API_KEY: ${{ secrets.BOCHA_API_KEY }} 
+        WECOM_WEBHOOK_URL: ${{ secrets.WECOM_WEBHOOK_URL }}
+        FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
       run: python ai_news.py
