@@ -6,19 +6,18 @@ from tavily import TavilyClient
 from datetime import datetime, timedelta, timezone
 
 # =========================================================
-# 🔴 核心配置区 (支持 本地硬编码 + GitHub Secrets 双模式)
+# 🔴 核心配置区 (已修复空值陷阱)
 # =========================================================
-# 玩法：
-# 1. 本地测试时：直接把 Key 填在后面的引号里 (例如 "sk-xxx")
-# 2. 上传 GitHub 时：不用改代码，GitHub 会自动读取前面的环境变量
+# 技巧：使用 'or' 关键字。
+# 逻辑：尝试读取环境变量 -> 如果是空的(None或"") -> 强制使用后面的硬编码 Key
 # =========================================================
 
-TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "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")
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-gvvsglcyhujlvprlryxtwduxvbgwfyzqngzqesyvwvucjnyw")
-BOCHA_API_KEY = os.environ.get("BOCHA_API_KEY", "sk-2fae396b559249da8dab4fe7de1ae125")
+TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY") or "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"
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY") or "sk-gvvsglcyhujlvprlryxtwduxvbgwfyzqngzqesyvwvucjnyw"
+BOCHA_API_KEY = os.environ.get("BOCHA_API_KEY") or "sk-2fae396b559249da8dab4fe7de1ae125"
 
-WECOM_WEBHOOK_URL = os.environ.get("WECOM_WEBHOOK_URL", "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=0ea95932-128f-47ca-bc26-0df9fbd41de0")
-FEISHU_WEBHOOK_URL = os.environ.get("FEISHU_WEBHOOK_URL", "https://open.feishu.cn/open-apis/bot/v2/hook/54e2a16a-8409-46c7-bd62-a169bc3e063f")
+WECOM_WEBHOOK_URL = os.environ.get("WECOM_WEBHOOK_URL") or "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=0ea95932-128f-47ca-bc26-0df9fbd41de0"
+FEISHU_WEBHOOK_URL = os.environ.get("FEISHU_WEBHOOK_URL") or "https://open.feishu.cn/open-apis/bot/v2/hook/54e2a16a-8409-46c7-bd62-a169bc3e063f"
 
 # =========================================================
 
@@ -33,13 +32,12 @@ def get_beijing_time():
 def get_tavily_data():
     print("1. 正在全网搜索 (Tavily - 国际视野)...")
     
-    # 简单的空值检查
+    # 检查 Key 是否包含占位符
     if not TAVILY_API_KEY or "在此粘贴" in TAVILY_API_KEY:
-        print("⚠️ Tavily Key 未配置，跳过")
+        print(f"⚠️ Tavily Key 未配置 (当前值: {TAVILY_API_KEY[:5]}...)，跳过")
         return []
         
     tavily = TavilyClient(api_key=TAVILY_API_KEY)
-    # 搜索词优化：覆盖 AI 巨头和技术关键词
     query = "AI Artificial Intelligence news latest trends OpenAI DeepSeek Google Nvidia updates"
     try:
         response = tavily.search(query=query, search_depth="advanced", max_results=15, days=1)
@@ -51,13 +49,13 @@ def get_tavily_data():
         return []
 
 # ---------------------------------------------------------
-# 🇨🇳 数据源 B: 博查 Bocha (国内精准 - 已修复结构)
+# 🇨🇳 数据源 B: 博查 Bocha (国内精准 - 结构修复版)
 # ---------------------------------------------------------
 def get_bocha_data():
     print("2. 正在尝试博查搜索 (Bocha - 国内视野)...")
     
     if not BOCHA_API_KEY or "在此粘贴" in BOCHA_API_KEY:
-        print("⚠️ Bocha Key 未配置，跳过")
+        print(f"⚠️ Bocha Key 未配置 (当前值: {BOCHA_API_KEY[:5]}...)，跳过")
         return [] 
         
     url = "https://api.bochaai.com/v1/web-search"
@@ -77,17 +75,16 @@ def get_bocha_data():
         if response.status_code == 200:
             data = response.json()
             
-            # 🔥 核心修复：根据你截图的真实结构提取数据
-            # 路径：data -> webPages -> value (列表在这里)
+            # 路径：data -> webPages -> value
             web_pages = data.get('data', {}).get('webPages', {})
             items_list = web_pages.get('value', [])
             
             results = []
             for item in items_list:
                 results.append({
-                    "title": item.get('name'),     # 博查返回的是 name
+                    "title": item.get('name'),
                     "url": item.get('url'),
-                    "content": item.get('snippet') # 博查返回的是 snippet
+                    "content": item.get('snippet')
                 })
             
             print(f"✅ Bocha 获取成功: {len(results)} 条")
@@ -113,7 +110,7 @@ def get_rss_data():
     try:
         for rss_url in rss_sources:
             feed = feedparser.parse(rss_url)
-            for entry in feed.entries[:10]: # 每个源取10条
+            for entry in feed.entries[:10]:
                 results.append({
                     "title": entry.title,
                     "url": entry.link,
@@ -126,27 +123,26 @@ def get_rss_data():
         return []
 
 # ---------------------------------------------------------
-# ⚙️ 核心调度逻辑 (混合双打 + 替补)
+# ⚙️ 核心调度逻辑
 # ---------------------------------------------------------
 def get_realtime_news():
     all_news = []
     
-    # 1. 获取 Tavily (国际)
+    # 1. Tavily
     tavily_data = get_tavily_data()
     all_news.extend(tavily_data)
     
-    # 2. 获取 Bocha (国内)
+    # 2. Bocha
     bocha_data = get_bocha_data()
     all_news.extend(bocha_data)
     
-    # 3. 智能判断：如果数据太少 (比如 < 5条)，说明 API 可能都挂了或者没新闻
-    #    这时候强制启动 RSS 兜底，保证日报有内容
+    # 3. 兜底判定
     if len(all_news) < 5:
         print("🛡️ 检测到 API 数据不足，强制启动 RSS 替补上场...")
         rss_data = get_rss_data()
         all_news.extend(rss_data)
         
-    # 简单去重 (按 URL)
+    # 去重
     seen_urls = set()
     unique_news = []
     for news in all_news:
@@ -175,7 +171,7 @@ def call_deepseek(prompt):
         "messages": [{"role": "user", "content": prompt}],
         "stream": False, 
         "temperature": 0.7, 
-        "max_tokens": 8000 # 增加 Token 以支持长日报
+        "max_tokens": 8000
     }
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=60)
@@ -192,7 +188,6 @@ def ai_process_content(news_data):
     if not news_data: return None
     
     beijing_date = get_beijing_time().strftime('%Y-%m-%d')
-    # 截取前 40 条投喂，防止超长
     data_str = json.dumps(news_data[:40], ensure_ascii=False)
 
     prompt = f"""
@@ -200,8 +195,8 @@ def ai_process_content(news_data):
     
     🔥 **你的任务：**
     1. **去重与清洗**：合并相似内容，剔除广告。
-    2. **热门排序**：根据【行业影响力】和【商业价值】进行降序排列。越重磅的新闻越靠前。
-    3. **输出数量**：**必须输出 20 条以上** 的核心情报（如果内容足够）。
+    2. **热门排序**：根据【行业影响力】和【商业价值】进行降序排列。
+    3. **输出数量**：**必须输出 20 条以上** 的核心情报。
     
     🔥 **输出格式要求**：
     ### 🚀 AI 全球情报内参 ({beijing_date})
@@ -226,13 +221,12 @@ def ai_process_content(news_data):
     return call_deepseek(prompt)
 
 # ---------------------------------------------------------
-# 📢 推送通道 (飞书/企微)
+# 📢 推送通道
 # ---------------------------------------------------------
 def push_wechat(content):
     if not content or not WECOM_WEBHOOK_URL or "在此粘贴" in WECOM_WEBHOOK_URL: return
     print("4.1 推送至企微...")
     
-    # 分段推送防止截断 (企微限制 4096 字节)
     if len(content.encode('utf-8')) > 4000:
         part1 = content[:3000] + "\n...(下接第二条)..."
         part2 = "...(接上条)...\n" + content[3000:]
@@ -272,15 +266,11 @@ def push_feishu(content):
 if __name__ == "__main__":
     print("🚀 启动 Max 版情报系统...")
     
-    # 1. 智能获取数据 (Tavily + Bocha + RSS)
     raw_data = get_realtime_news()
     
     if raw_data:
-        # 2. AI 排序与生成 (20条+)
         final_text = ai_process_content(raw_data)
-        
         if final_text:
-            # 3. 推送
             push_wechat(final_text)
             push_feishu(final_text)
             print("✅ 任务全部完成")
