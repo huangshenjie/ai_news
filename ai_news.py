@@ -4,7 +4,7 @@ from tavily import TavilyClient
 from datetime import datetime, timedelta, timezone
 
 # =========================================================
-# 🔴 核心配置区 (Key 保持不变，无需修改)
+# 🔴 核心配置区 (Key 保持不变)
 # =========================================================
 # 1. 搜索与 AI Key
 TAVILY_API_KEY = "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"
@@ -18,12 +18,10 @@ WECOM_WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=0ea959
 FEISHU_WEBHOOK_URL = "https://open.feishu.cn/open-apis/bot/v2/hook/54e2a16a-8409-46c7-bd62-a169bc3e063f"
 # =========================================================
 
-# 🔥 新增：获取北京时间的辅助函数
+# 1. 获取北京时间的函数
 def get_beijing_time():
-    # UTC 时间 + 8 小时 = 北京时间
     utc_now = datetime.now(timezone.utc)
-    beijing_time = utc_now + timedelta(hours=8)
-    return beijing_time
+    return utc_now + timedelta(hours=8)
 
 def get_realtime_news():
     print("1. 正在全网搜索 (优先国内信源)...")
@@ -57,33 +55,45 @@ def call_deepseek(prompt):
 def ai_process_content(news_data):
     if not news_data: return None
     
-    # 🔥 修改点 1：标题使用北京时间
+    # 获取北京日期用于标题
     beijing_date = get_beijing_time().strftime('%Y-%m-%d')
 
+    # 🔥 核心修复：在 Prompt 中把【示例】加回来，强制 AI 模仿
     prompt = f"""
     你是一名具有商业洞察力的 AI 战略顾问。请根据以下原始搜索数据，为我撰写一份【高价值】的行业内参。
     数据：{json.dumps(news_data, ensure_ascii=False)}
 
     🔥 **第一部分：资讯追踪 (15-20条)**
-    1. 筛选 15-20 条高价值新闻。
-    2. 使用长句标题（主谓宾+核心影响）。
-    3. **优先展示国内直连链接**。
+    1. **筛选标准**：保留最有技术含量或商业影响力的 15-20 条新闻。
+    2. **标题格式（严格执行）**：
+       - ✅ 必须包含分类标签，例如：**[重磅]**、**[技术]**、**[行业]**、**[应用]**。
+       - ✅ 必须使用长句标题（主谓宾+核心影响）。
+       - ❌ 禁止只有标题没有标签。
+    3. **链接要求**：优先展示国内直连链接。
     
     🔥 **第二部分：深度战略研判**
     1. **行业变局**：...
     2. **崛起风口**：...
     3. **落地机会**：...
 
-    📝 **输出格式**：
+    📝 **输出格式范例（请严格模仿此格式）**：
     ### 🚀 AI 全球情报内参 ({beijing_date})
     > 🧠 智能驱动：DeepSeek V3 | 🌍 信源：Tavily
     
     #### 📰 核心动态
-    ...
+    1. **[重磅] OpenAI 发布新一代推理模型，参数量减少 50% 但性能超越 GPT-4**
+       🔗 [机器之心](url)
+    2. **[行业] 字节跳动推出 AI 视频生成工具，支持 60 秒超长连贯镜头**
+       🔗 [36氪](url)
+    3. **[技术] DeepSeek 开源 V3 架构，多项基准测试击败 Llama 3**
+       🔗 [IT之家](url)
+    ... (请列出 15-20 条)
     
     ---
     #### 🔭 深度战略研判
-    ...
+    * **⚡ 行业变局**：...
+    * **📈 崛起风口**：...
+    * **💰 落地机会**：...
     
     *(AI总结，仅供参考)*
     """
@@ -93,8 +103,8 @@ def push_wechat(content):
     try:
         if not content or not WECOM_WEBHOOK_URL: return
     except NameError: return
-
     print("3.1 推送至企微...")
+    
     if len(content.encode('utf-8')) > 4000:
         content = content[:3000] + "\n\n...(内容过长截断)... \n*(AI总结，仅供参考)*"
     
@@ -107,10 +117,9 @@ def push_feishu(content):
     try:
         if not content or not FEISHU_WEBHOOK_URL: return
     except NameError: return
-
     print("3.2 推送至飞书...")
     
-    # 🔥 修改点 2：底部时间戳使用北京时间
+    # 底部时间戳使用北京时间
     current_time = get_beijing_time().strftime('%Y-%m-%d %H:%M')
 
     if len(content.encode('utf-8')) > 30000:
