@@ -68,11 +68,13 @@ def get_bocha_data():
         response = requests.post(url, json=payload, headers=headers, timeout=10)
         if response.status_code == 200:
             data = response.json()
+            # 路径：data -> webPages -> value
             web_pages = data.get('data', {}).get('webPages', {})
             items_list = web_pages.get('value', [])
             
             results = []
             for item in items_list:
+                # 简单的清洗，去掉太短的标题
                 if len(item.get('name', '')) > 5:
                     results.append({
                         "title": item.get('name'),
@@ -115,13 +117,19 @@ def get_rss_data():
 # ---------------------------------------------------------
 def get_realtime_news():
     all_news = []
+    
+    # 1. 获取 Tavily (20条)
     all_news.extend(get_tavily_data())
+    
+    # 2. 获取 Bocha (20条)
     all_news.extend(get_bocha_data())
     
+    # 3. 只有当两者加起来都很少时，才用 RSS
     if len(all_news) < 5:
         print("🛡️ API 数据不足，强制启动 RSS 补充...")
         all_news.extend(get_rss_data())
         
+    # 去重
     seen_urls = set()
     unique_news = []
     for news in all_news:
@@ -134,7 +142,7 @@ def get_realtime_news():
     return unique_news
 
 # ---------------------------------------------------------
-# 🧠 DeepSeek 思考与清洗 (Prompt 4维度升级版)
+# 🧠 DeepSeek 思考与清洗 (Prompt 4维度升级版 + 超时修复)
 # ---------------------------------------------------------
 def call_deepseek(prompt):
     print("3. 正在调用 DeepSeek V3 进行深度分析与排序...")
@@ -152,23 +160,27 @@ def call_deepseek(prompt):
         "max_tokens": 8000
     }
     try:
-        response = requests.post(url, headers=headers, json=payload, timeout=60)
+        # 🔥 核心修改：timeout 从 60 改为 180 (给它 3 分钟思考时间)
+        response = requests.post(url, headers=headers, json=payload, timeout=180)
+        
         if response.status_code == 200:
             return response.json()['choices'][0]['message']['content']
         else:
             print(f"❌ DeepSeek 接口报错: {response.text}")
             return None
     except Exception as e:
-        print(f"网络请求异常: {e}")
+        print(f"❌ DeepSeek 请求异常 (可能是超时): {e}")
         return None
 
 def ai_process_content(news_data):
     if not news_data: return None
     
     beijing_date = get_beijing_time().strftime('%Y-%m-%d')
-    data_str = json.dumps(news_data[:50], ensure_ascii=False)
+    
+    # 🔥 优化：将投喂量从 50 降为 35，防止 Token 爆炸导致超时，同时保证质量
+    data_str = json.dumps(news_data[:35], ensure_ascii=False)
 
-    # 🔥 核心修改：Prompt 强制要求 4 维度战略研判
+    # 🔥 4 维度深度研判 Prompt
     prompt = f"""
     你是一名残酷、挑剔且极具商业洞察力的顶级 AI 战略顾问。这里有 {len(news_data)} 条关于 AI 的原始资讯。
     请从中提炼出 **20 条** 最有价值的情报，并撰写一份深度的《AI 全球实战内参》。
