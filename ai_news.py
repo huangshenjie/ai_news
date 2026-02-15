@@ -32,8 +32,8 @@ def get_tavily_data():
         return []
         
     tavily = TavilyClient(api_key=TAVILY_API_KEY)
-    # 关键词优化：增加 'money', 'business', 'startups' 引导商业新闻
-    query = "AI Artificial Intelligence news business impact startups money trends OpenAI DeepSeek Nvidia Google"
+    # 关键词优化：增加 'money', 'business', 'jobs' 引导更接地气的新闻
+    query = "AI Artificial Intelligence news business impact jobs money trends OpenAI DeepSeek Nvidia Google"
     try:
         response = tavily.search(query=query, search_depth="advanced", max_results=20, days=1)
         results = response.get('results', [])
@@ -59,7 +59,7 @@ def get_bocha_data():
         "Content-Type": "application/json"
     }
     payload = {
-        "query": "DeepSeek 商业化 赚钱机会 AI创业 融资快讯 site:36kr.com OR site:qbitai.com OR site:jiqizhixin.com",
+        "query": "DeepSeek 商业化 赚钱机会 AI创业 融资快讯 行业变局 site:36kr.com OR site:qbitai.com OR site:jiqizhixin.com",
         "freshness": "oneDay",
         "count": 20
     }
@@ -68,13 +68,11 @@ def get_bocha_data():
         response = requests.post(url, json=payload, headers=headers, timeout=10)
         if response.status_code == 200:
             data = response.json()
-            # 路径：data -> webPages -> value
             web_pages = data.get('data', {}).get('webPages', {})
             items_list = web_pages.get('value', [])
             
             results = []
             for item in items_list:
-                # 简单的清洗，去掉太短的标题
                 if len(item.get('name', '')) > 5:
                     results.append({
                         "title": item.get('name'),
@@ -117,19 +115,13 @@ def get_rss_data():
 # ---------------------------------------------------------
 def get_realtime_news():
     all_news = []
-    
-    # 1. 获取 Tavily (20条)
     all_news.extend(get_tavily_data())
-    
-    # 2. 获取 Bocha (20条)
     all_news.extend(get_bocha_data())
     
-    # 3. 只有当两者加起来都很少时，才用 RSS
     if len(all_news) < 5:
         print("🛡️ API 数据不足，强制启动 RSS 补充...")
         all_news.extend(get_rss_data())
         
-    # 去重
     seen_urls = set()
     unique_news = []
     for news in all_news:
@@ -142,7 +134,7 @@ def get_realtime_news():
     return unique_news
 
 # ---------------------------------------------------------
-# 🧠 DeepSeek 思考与清洗 (Prompt 4维度升级版 + 超时修复)
+# 🧠 DeepSeek 思考与清洗 (Pro Max 人话版)
 # ---------------------------------------------------------
 def call_deepseek(prompt):
     print("3. 正在调用 DeepSeek V3 进行深度分析与排序...")
@@ -160,7 +152,7 @@ def call_deepseek(prompt):
         "max_tokens": 8000
     }
     try:
-        # 🔥 核心修改：timeout 从 60 改为 180 (给它 3 分钟思考时间)
+        # 保持 180s 超时设置，确保思考充分
         response = requests.post(url, headers=headers, json=payload, timeout=180)
         
         if response.status_code == 200:
@@ -169,34 +161,45 @@ def call_deepseek(prompt):
             print(f"❌ DeepSeek 接口报错: {response.text}")
             return None
     except Exception as e:
-        print(f"❌ DeepSeek 请求异常 (可能是超时): {e}")
+        print(f"❌ DeepSeek 请求异常: {e}")
         return None
 
 def ai_process_content(news_data):
     if not news_data: return None
     
     beijing_date = get_beijing_time().strftime('%Y-%m-%d')
-    
-    # 🔥 优化：将投喂量从 50 降为 35，防止 Token 爆炸导致超时，同时保证质量
+    # 保持 35 条投喂量
     data_str = json.dumps(news_data[:35], ensure_ascii=False)
 
-    # 🔥 4 维度深度研判 Prompt
+    # 🔥🔥 核心 Prompt 修改：要求“说人话”且“逻辑清晰” 🔥🔥
     prompt = f"""
-    你是一名残酷、挑剔且极具商业洞察力的顶级 AI 战略顾问。这里有 {len(news_data)} 条关于 AI 的原始资讯。
-    请从中提炼出 **20 条** 最有价值的情报，并撰写一份深度的《AI 全球实战内参》。
+    你是一名**极度务实、拒绝废话**的 AI 商业情报专家。这里有 {len(news_data)} 条关于 AI 的原始资讯。
+    请提炼出 **20 条** 最有价值的情报，并撰写一份《AI 全球实战内参》。
 
-    **❌ 严禁出现的问题：**
-    1. 标题空洞（如“XX发布新功能”）。
-    2. 标签笼统（如 [技术]）。
-    3. **战略研判模糊**（严禁写“我们需要关注XX”，要写“现在立刻去更XX”）。
+    **❌ 绝对禁止：**
+    1. **禁止堆砌专业术语：** 比如“端侧推理”、“垂直整合”、“护城河”，除非你马上用通俗语言解释它意味着什么。
+    2. **禁止空洞结论：** 别说“未来可期”或“需要关注”，要告诉我“现在该干什么”。
+    3. **禁止标题党：** 标题必须包含具体事实。
 
     **✅ 必须执行的标准：**
-    1. **资讯部分**：标题必须包含【谁 + 做了什么 + 具体影响/数据】。链接必须另起一行，格式为 `🔗 [媒体名](url)`。
-    2. **战略研判部分（核心）**：必须严格按照以下四个维度进行深度剖析：
-       - **维度一：⚡ 格局重塑** (行业现状/巨头博弈/护城河变化)
-       - **维度二：🌪️ 崛起风口** (红利机会/资金流向/信息差)
-       - **维度三：💰 落地变现** (普通人/开发者/创业者 具体能做什么？怎么搞钱？)
-       - **维度四：🎯 核心结论** (一句话总结今日风向)
+    1. **资讯部分**：标题 = 【谁 + 做了什么 + 结果/影响】。链接另起一行 `🔗 [媒体名](url)`。
+    2. **深度战略研判（核心中的核心）**：
+       - 请用**“大白话”**把事情讲清楚。
+       - 必须解释**“为什么”**（底层逻辑）和**“怎么做”**（具体行动）。
+       - 必须覆盖以下四个维度：
+
+       **维度一：⚡ 到底发生了什么？ (世界观)**
+       不要只罗列新闻，要把新闻串起来。告诉读者：今天巨头们打架的本质是什么？谁慌了？谁赢了？市场规则变了没？
+
+       **维度二：💰 钱流向了哪里？ (风口)**
+       资金正在往哪个具体的细分领域涌入？不是“AI应用”，而是“AI视频生成”还是“医疗数据清洗”？
+
+       **维度三：👉 普通人/创业者怎么干？ (实操)**
+       * **对普通打工人**：别说“提升自我”，要说“去学 XX 工具，因为 XX 岗位正在高薪招人”。
+       * **对小创业者**：别说“布局AI”，要说“去干 XX 细分业务，因为大厂看不上但很赚钱”。
+
+       **维度四：🛑 最终建议 (一句话)**
+       给读者的最后忠告，犀利、直接。
 
     **🔥 输出格式模板（请严格模仿）：**
 
@@ -204,30 +207,30 @@ def ai_process_content(news_data):
     > 🧠 智能驱动：DeepSeek V3 | 🌍 覆盖信源：Tavily (国际) + Bocha (国内)
     
     #### ⭐ 顶级重磅 (Top 3)
-    1. **[芯片封锁] 英伟达特供版 H20 芯片被曝停供，国内大模型训练成本或上涨 30%**
-       🔗 [36氪](https://...)
+    1. **[巨头互殴] 亚马逊停止采购英伟达芯片，转用自研芯片，英伟达股价应声下跌 5%**
+       🔗 [CNBC](https://...)
     ...
     
     #### 📰 行业必读 (Top 4-20)
-    4. **[融资风向] 只做 AI 应用的 Jasper 估值缩水 40%，SaaS 壳公司泡沫破裂**
-       🔗 [TheInfo](https://...)
     ...
     
     ---
-    #### 🔭 深度战略研判
+    #### 🔭 深度战略研判 (通俗版)
     
-    **1. ⚡ 格局重塑：**
-    OpenAI 与 Google 的模型护城河已断裂。DeepSeek 的开源证明了“蒸馏+微调”可以低成本复刻 95% 的能力。现在的战场从“拼模型参数”转移到了“拼私有数据”和“端侧部署”。
+    **1. ⚡ 到底发生了什么？**
+    简单来说，以前大家都给英伟达交“过路费”，现在亚马逊和谷歌觉得太贵，决定自己造路了。这意味着英伟达一家独大的日子结束了，AI 芯片的价格会被打下来，我们以后用 AI 服务的成本会变低。
 
-    **2. 🌪️ 崛起风口：**
-    **“企业私有化部署”** 是当前最大的红利。因为数据安全顾虑，大量公司不敢用 ChatGPT，但急需 DeepSeek 本地版。懂 Docker 部署和微调的技术人员，现在是市场上的香饽饽。
+    **2. 💰 钱流向了哪里？**
+    热钱正在从“造大模型”转向“电力和数据”。
+    * **电力：** AI 极其耗电，谁能搞定便宜的电（比如核电、偏远水电），谁就是大爷。
+    * **数据：** 网上能爬的免费数据都被爬光了，现在这种“经过律师确认、医生标注”的高质量私有数据，价格翻了3倍。
 
-    **3. 💰 落地变现：**
-    * **针对普通人：** 别再学 Prompt 工程了，去学 ComfyUI 工作流和 AI 视频生成，这是接单变现最快的领域。
-    * **针对创业者：** 放弃“套壳 Chat”，去做“垂直行业的数据清洗服务”。所有大模型公司都缺高质量数据，这是一门卖铲子的生意。
+    **3. 👉 我们该怎么干？**
+    * **普通打工人：** 建议去看看 **ComfyUI**（一种画图工具）或者 **Cursor**（AI写代码工具）。现在很多公司招人要求“会用 AI 提效”，而不只是“会干活”。学会这个，你就有溢价。
+    * **小创业者/副业党：** 别去卷大模型，没戏。去看看**“数据标注”**的包工头生意，或者给传统小公司（比如律所、诊所）做**“私有知识库搭建”**。他们不敢把数据传给 ChatGPT，这恰恰是 DeepSeek 本地部署的机会。
 
-    **4. 🎯 核心结论：**
-    模型不值钱了，数据和场景才是黄金。别造轮子，去造车。
+    **4. 🛑 最终建议：**
+    不要焦虑 AI 会取代你，先去把那个能帮你干活的 AI 工具装进电脑里。
     
     **原始数据投喂：**
     {data_str}
@@ -272,7 +275,7 @@ def push_feishu(content):
 # 🚀 主程序入口
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    print("🚀 启动 Pro Max 版情报系统...")
+    print("🚀 启动 Pro Max (人话版) 情报系统...")
     raw_data = get_realtime_news()
     if raw_data:
         final_text = ai_process_content(raw_data)
