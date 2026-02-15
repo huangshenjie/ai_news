@@ -173,4 +173,121 @@ def call_deepseek(prompt):
         else:
             print(f"❌ DeepSeek 接口报错: {response.text}")
             return None
-    except Exception as e
+    except Exception as e:
+        print(f"❌ DeepSeek 请求异常: {e}")
+        return None
+
+def ai_process_content(news_data):
+    if not news_data: return None
+    
+    beijing_date = get_beijing_time().strftime('%Y-%m-%d')
+    
+    # 🔥 投喂量拉满：给 70 条，让它从中挑最好的 20 条
+    data_str = json.dumps(news_data[:70], ensure_ascii=False)
+
+    # 🔥🔥 严选 Prompt：按热度排序，拒绝凑数 🔥🔥
+    prompt = f"""
+    你是一名**极度挑剔、只关注重磅消息**的 AI 首席主编。这里有 {len(news_data)} 条原始资讯。
+    你的任务是从中筛选出 **Top 20** 条最有价值的情报，并按**【影响力/热度】降序排列**。
+
+    **❌ 严禁（凑数行为）：**
+    1. **剔除鸡毛蒜皮：** 某公司发布了一个小补丁、某人发表了一句无关痛痒的话 -> **直接删掉**。
+    2. **剔除重复冗余：** 同一件大事如果有多个来源，只保留分析最深度的一个。
+    3. **严禁编造：** 如果有价值的新闻不足 20 条，宁可只写 15 条，也不要编造或凑数。
+
+    **✅ 必须执行的标准（按热度排序）：**
+    1. **优先级逻辑：** - **Level S (最高):** 导致股市暴跌/暴涨、国家级政策禁令、颠覆性技术发布（如 GPT-5）。
+       - **Level A (中等):** 巨头战略转向、亿级融资、重大高管变动。
+       - **Level B (一般):** 有趣的新应用、行业数据报告。
+    2. **资讯格式：** - 标题 = 【标签】+ 核心事实 + **(数据/影响)**。
+       - 必须在标题下方换行附带链接：`🔗 [媒体名](url)`。
+
+    **🔥 输出格式模板：**
+
+    ### 🚀 AI 全球实战内参 ({beijing_date})
+    > 🧠 智能驱动：DeepSeek V3 | 🌍 覆盖信源：Tavily (国际) + Bocha (国内)
+    
+    #### ⭐ 顶级重磅 (Level S - 必读)
+    1. **[股市震荡] DeepSeek 效应持续，英伟达市值单日蒸发 2000 亿，华尔街下调 AI 硬件评级**
+       🔗 [Bloomberg](url)
+    2. **[技术封锁] 美国商务部拟对中国 AI 模型实施“字节跳动式”禁令，禁止云厂商提供算力**
+       🔗 [Reuters](url)
+    ...
+    
+    #### 📰 行业焦点 (Level A - 核心动态)
+    ...
+    
+    #### 💡 创新与应用 (Level B - 机会前瞻)
+    ...
+    
+    ---
+    #### 🔭 深度战略研判 (通俗版)
+    
+    **1. ⚡ 到底发生了什么？ (本质)**
+    （用大白话解释今天的头条新闻背后的博弈。谁动了谁的蛋糕？）
+
+    **2. 💰 钱流向了哪里？ (风口)**
+    （指出资金正在疯狂涌入的具体细分赛道）
+
+    **3. 👉 我们该怎么干？ (实操)**
+    * **普通打工人：** ...
+    * **创业者/搞钱党：** ...
+
+    **4. 🛑 最终建议：**
+    （一句话犀利总结）
+    
+    **原始数据投喂：**
+    {data_str}
+    """
+    return call_deepseek(prompt)
+
+# ---------------------------------------------------------
+# 📢 推送通道
+# ---------------------------------------------------------
+def push_wechat(content):
+    if not content or not WECOM_WEBHOOK_URL or "在此粘贴" in WECOM_WEBHOOK_URL: return
+    print("4.1 推送至企微...")
+    if len(content.encode('utf-8')) > 4000:
+        part1 = content[:3000] + "\n...(下接第二条)..."
+        part2 = "...(接上条)...\n" + content[3000:]
+        requests.post(WECOM_WEBHOOK_URL, json={"msgtype": "markdown", "markdown": {"content": part1}})
+        requests.post(WECOM_WEBHOOK_URL, json={"msgtype": "markdown", "markdown": {"content": part2}})
+    else:
+        requests.post(WECOM_WEBHOOK_URL, json={"msgtype": "markdown", "markdown": {"content": content}})
+
+def push_feishu(content):
+    if not content or not FEISHU_WEBHOOK_URL or "在此粘贴" in FEISHU_WEBHOOK_URL: return
+    print("4.2 推送至飞书...")
+    current_time = get_beijing_time().strftime('%Y-%m-%d %H:%M')
+    payload = {
+        "msg_type": "interactive",
+        "card": {
+            "config": {"wide_screen_mode": True},
+            "header": {
+                "template": "blue",
+                "title": {"content": "🚀 AI 全球实战内参", "tag": "plain_text"}
+            },
+            "elements": [
+                {"tag": "markdown", "content": content},
+                {"tag": "note", "elements": [{"tag": "plain_text", "content": f"更新: {current_time}"}]}
+            ]
+        }
+    }
+    requests.post(FEISHU_WEBHOOK_URL, json=payload)
+
+# ---------------------------------------------------------
+# 🚀 主程序入口
+# ---------------------------------------------------------
+if __name__ == "__main__":
+    print("🚀 启动 AI 情报系统 (严选版)...")
+    raw_data = get_realtime_news()
+    if raw_data:
+        final_text = ai_process_content(raw_data)
+        if final_text:
+            push_wechat(final_text)
+            push_feishu(final_text)
+            print("✅ 任务完成")
+        else:
+            print("⚠️ DeepSeek 生成为空")
+    else:
+        print("❌ 无数据")
