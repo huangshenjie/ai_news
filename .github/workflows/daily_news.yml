@@ -2,6 +2,7 @@ name: Daily AI News
 
 on:
   schedule:
+    # 北京时间 08:30 (UTC 00:30)
     - cron: '30 0 * * *'
   workflow_dispatch:
 
@@ -26,10 +27,10 @@ jobs:
 
     - name: Run AI News Script
       env:
-        # 传递所有 Secrets
+        # 🔥 将 Secrets 注入到环境变量中
         TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
         DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-        BOCHA_API_KEY: ${{ secrets.BOCHA_API_KEY }} 
+        BOCHA_API_KEY: ${{ secrets.BOCHA_API_KEY }}
         WECOM_WEBHOOK_URL: ${{ secrets.WECOM_WEBHOOK_URL }}
         FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
       run: python ai_news.py
