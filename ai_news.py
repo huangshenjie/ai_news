@@ -31,10 +31,9 @@ def get_tavily_data():
         return []
     
     tavily = TavilyClient(api_key=TAVILY_API_KEY)
-    # 关键词策略：覆盖 股市、危机、突破、商业落地
-    query = "AI artificial intelligence breaking news stock market crisis breakthrough OpenAI DeepSeek Nvidia Google business impact"
+    # 策略：增加 energy, infrastructure, arbitrage 等词，引导搜出基建和套利相关新闻
+    query = "AI artificial intelligence breaking news energy crisis infrastructure arbitrage stock market business impact OpenAI DeepSeek"
     try:
-        # 抓取 25 条，确保素材库充足
         response = tavily.search(query=query, search_depth="advanced", max_results=25, days=1)
         results = response.get('results', [])
         print(f"✅ Tavily 获取成功: {len(results)} 条")
@@ -58,9 +57,9 @@ def get_bocha_data():
         "Content-Type": "application/json"
     }
     payload = {
-        "query": "DeepSeek 商业化 股价暴跌 行业重磅 融资首发 AI落地案例 site:36kr.com OR site:qbitai.com OR site:jiqizhixin.com",
+        "query": "DeepSeek 商业化 算力电力 监管套利 行业重磅 融资首发 AI落地案例 site:36kr.com OR site:qbitai.com OR site:jiqizhixin.com",
         "freshness": "oneDay",
-        "count": 25 # 抓取 25 条
+        "count": 25
     }
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=10)
@@ -117,12 +116,10 @@ def get_realtime_news():
     
     print(f"📊 原始素材池总数: {len(all_news)} 条")
 
-    # 如果素材太少，用 RSS 强行补货
     if len(all_news) < 20:
         print("🛡️ 素材不足，启动 RSS 补充...")
         all_news.extend(get_rss_data())
         
-    # 去重
     seen_urls = set()
     unique_news = []
     for news in all_news:
@@ -135,10 +132,10 @@ def get_realtime_news():
     return unique_news
 
 # ---------------------------------------------------------
-# 🧠 DeepSeek 思考与清洗 (Pro Max+ 解读版)
+# 🧠 DeepSeek 思考与清洗 (Pro Max+ 深度拆解版)
 # ---------------------------------------------------------
 def call_deepseek(prompt):
-    print("3. 正在调用 DeepSeek V3 进行深度筛选与解读...")
+    print("3. 正在调用 DeepSeek V3 进行深度筛选与详细解读...")
     if not DEEPSEEK_API_KEY or "在此粘贴" in DEEPSEEK_API_KEY:
         print("❌ DeepSeek Key 未配置")
         return None
@@ -150,10 +147,11 @@ def call_deepseek(prompt):
         "messages": [{"role": "user", "content": prompt}],
         "stream": False, 
         "temperature": 0.7, 
+        # 🔥 Token 拉满，防止回答被截断
         "max_tokens": 8000
     }
     try:
-        # 给足 3 分钟思考时间
+        # 🔥 保持 180s 超时
         response = requests.post(url, headers=headers, json=payload, timeout=180)
         if response.status_code == 200:
             return response.json()['choices'][0]['message']['content']
@@ -168,107 +166,43 @@ def ai_process_content(news_data):
     if not news_data: return None
     
     beijing_date = get_beijing_time().strftime('%Y-%m-%d')
-    
-    # 投喂 70 条，保证有足够素材
     data_str = json.dumps(news_data[:70], ensure_ascii=False)
 
-    # 🔥🔥 核心 Prompt 修改：强制 20 条 + 人话解读 + 落地建议 🔥🔥
+    # 🔥🔥 核心 Prompt 修改：要求“详细拆解”、“逻辑闭环”、“多路径建议” 🔥🔥
     prompt = f"""
-    你是一名**极度务实、擅长说人话**的 AI 商业情报专家。这里有 {len(news_data)} 条原始资讯。
-    请从中筛选并整理出 **20 条** 情报，撰写一份《AI 全球实战内参》。
+    你是一名**极度务实、擅长深度剖析**的 AI 商业战略顾问。这里有 {len(news_data)} 条原始资讯。
+    请撰写一份《AI 全球实战内参》，分为“资讯情报”和“深度研判”两部分。
 
-    **核心任务：**
-    1. **必须凑齐 20 条：** 按【S级 重磅】、【A级 焦点】、【B级 应用】三层分级。如果 S 级不够，就用 A/B 级填满 20 条，**严禁少于 20 条**。
-    2. **人话解读（重点）：** 在每一条新闻下，必须增加一句 **`💡 解读：`**。用最直白的话告诉读者：**这件事意味着什么？是利好还是利空？**（不用点开链接也能看懂）。
-    3. **深度研判：** 最后的总结不要虚头巴脑，要直接点名**行业**和**方向**。
+    **第一部分：资讯情报 (20条)**
+    1. **凑齐 20 条：** 按【S级 重磅】、【A级 焦点】、【B级 应用】三层分级。如果 S 级不够，用 A/B 级填满，**严禁少于 20 条**。
+    2. **人话解读：** 每条新闻下必须有一句 `💡 解读：`，用大白话解释对行业/个人的具体影响。
 
-    **🔥 输出格式模板（请严格模仿）：**
+    **第二部分：深度战略研判 (必须详细、拆解逻辑)**
+    *这是本报告的灵魂，请不要吝啬笔墨，要像“老师傅”带徒弟一样把逻辑讲透。*
+
+    **1. ⚡ 到底发生了什么？ (底层逻辑)**
+    不要只重复新闻。要解释表象背后的**博弈逻辑**。
+    * 例如：DeepSeek 的低成本不仅仅是省钱，它打破了美国科技巨头的什么垄断？为什么这会让华尔街恐慌？
+
+    **2. 💰 钱流向了哪里？ (必须解释“为什么”)**
+    * **硬钱（基建/能源）：** * 不要只说“电力”，要解释：为什么 AI 会导致缺电？为什么风电不行，火电/核电却火了？（提示：解释数据中心的稳定性需求）。
+        * 提及“老旧数据中心改造”带来的机会。
+    * **软钱（B2B应用）：** * 具体指哪些软件？（例如：法律AI、医疗影像AI）。为什么这些比通用大模型赚钱？
+    * **快钱（套利/信息差）：** * **必须详细解释“监管套利”**：举例说明（例如：把国产模型包装成海外壳公司，卖给受限制的地区；或者利用国内外信息差做倒卖）。让读者看懂这个灰色/灰色地带的操作逻辑。
+
+    **3. 👉 我们该怎么干？ (分人群多路径建议)**
+    不要只说“去学习”。请针对不同人群给出**具体、可执行**的建议：
+    * **路径 A (打工人/转型)：** 比如“学习 ComfyUI 做商业切片”，或者“转行去做 AI 数据中心的运维（蓝领）”。
+    * **路径 B (小创业者/生意人)：** 比如“给传统企业（如律所、餐馆）做私有化知识库部署”，解释为什么他们需要这个。
+    * **路径 C (投资者/投机者)：** 比如“关注电网设备股”或者“做空硬件泡沫”。
+
+    **4. 🛑 终极总结 (趋势预判)**
+    对未来 1-3 年的局势做一个详细推演，而不是一句口号。
+
+    **🔥 输出格式模板：**
 
     ### 🚀 AI 全球实战内参 ({beijing_date})
     > 🧠 智能驱动：DeepSeek V3 | 🌍 覆盖信源：Tavily (国际) + Bocha (国内)
     
     #### ⭐ 顶级重磅 (Level S - 必读)
-    1. **[标签] 标题 (包含核心数据/结果)**
-       🔗 [媒体名](url)
-       💡 **解读：** (用一句话大白话解释：比如“英伟达垄断被打破了，显卡可能要降价。”)
-    
-    2. ...
-    
-    #### 📰 行业焦点 (Level A - 核心动态)
-    ...
-    (此处必须列出足够多的条目，直到填满 20 条为止)
-    20. **[标签] 标题...**
-       🔗 [媒体名](url)
-       💡 **解读：** ...
-
-    ---
-    #### 🔭 深度战略研判 (通俗版)
-    
-    **1. ⚡ 到底发生了什么？ (局势)**
-    （用大白话解释今天的头条新闻背后的博弈。谁动了谁的蛋糕？）
-
-    **2. 💰 钱流向了哪里？ (风口)**
-    （指出资金正在疯狂涌入的具体细分赛道，例如“不要只看大模型，要去关注 AI 电力设施”）
-
-    **3. 👉 我们该怎么干？ (实操)**
-    * **普通打工人：** （建议学什么具体工具/转行什么具体岗位）
-    * **创业者/搞钱党：** （建议切入什么具体细分市场，比如“给律所做私有化部署”）
-
-    **4. 🛑 最终建议：**
-    （一句话犀利总结）
-    
-    **原始数据投喂：**
-    {data_str}
-    """
-    return call_deepseek(prompt)
-
-# ---------------------------------------------------------
-# 📢 推送通道
-# ---------------------------------------------------------
-def push_wechat(content):
-    if not content or not WECOM_WEBHOOK_URL or "在此粘贴" in WECOM_WEBHOOK_URL: return
-    print("4.1 推送至企微...")
-    if len(content.encode('utf-8')) > 4000:
-        part1 = content[:3000] + "\n...(下接第二条)..."
-        part2 = "...(接上条)...\n" + content[3000:]
-        requests.post(WECOM_WEBHOOK_URL, json={"msgtype": "markdown", "markdown": {"content": part1}})
-        requests.post(WECOM_WEBHOOK_URL, json={"msgtype": "markdown", "markdown": {"content": part2}})
-    else:
-        requests.post(WECOM_WEBHOOK_URL, json={"msgtype": "markdown", "markdown": {"content": content}})
-
-def push_feishu(content):
-    if not content or not FEISHU_WEBHOOK_URL or "在此粘贴" in FEISHU_WEBHOOK_URL: return
-    print("4.2 推送至飞书...")
-    current_time = get_beijing_time().strftime('%Y-%m-%d %H:%M')
-    payload = {
-        "msg_type": "interactive",
-        "card": {
-            "config": {"wide_screen_mode": True},
-            "header": {
-                "template": "blue",
-                "title": {"content": "🚀 AI 全球实战内参", "tag": "plain_text"}
-            },
-            "elements": [
-                {"tag": "markdown", "content": content},
-                {"tag": "note", "elements": [{"tag": "plain_text", "content": f"更新: {current_time}"}]}
-            ]
-        }
-    }
-    requests.post(FEISHU_WEBHOOK_URL, json=payload)
-
-# ---------------------------------------------------------
-# 🚀 主程序入口
-# ---------------------------------------------------------
-if __name__ == "__main__":
-    print("🚀 启动 AI 情报系统 (Max解读版)...")
-    raw_data = get_realtime_news()
-    if raw_data:
-        final_text = ai_process_content(raw_data)
-        if final_text:
-            push_wechat(final_text)
-            push_feishu(final_text)
-            print("✅ 任务完成")
-        else:
-            print("⚠️ DeepSeek 生成为空")
-    else:
-        print("❌ 无数据")
+    1.
