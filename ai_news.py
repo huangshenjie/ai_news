@@ -6,14 +6,16 @@ from tavily import TavilyClient
 from datetime import datetime, timedelta, timezone
 
 # =========================================================
-# 🔴 核心配置区 (支持 本地硬编码 + GitHub Secrets 双模式)
+# 🔴 核心配置区 (安全版：只从环境变量读取)
 # =========================================================
-TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY") or "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"
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY") or "sk-gvvsglcyhujlvprlryxtwduxvbgwfyzqngzqesyvwvucjnyw"
-BOCHA_API_KEY = os.environ.get("BOCHA_API_KEY") or "sk-2fae396b559249da8dab4fe7de1ae125"
+# 注意：这里不再有 "or 'sk-xxx'"，强制要求必须配置环境变量
+# =========================================================
+TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+BOCHA_API_KEY = os.environ.get("BOCHA_API_KEY")
 
-WECOM_WEBHOOK_URL = os.environ.get("WECOM_WEBHOOK_URL") or "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=0ea95932-128f-47ca-bc26-0df9fbd41de0"
-FEISHU_WEBHOOK_URL = os.environ.get("FEISHU_WEBHOOK_URL") or "https://open.feishu.cn/open-apis/bot/v2/hook/54e2a16a-8409-46c7-bd62-a169bc3e063f"
+WECOM_WEBHOOK_URL = os.environ.get("WECOM_WEBHOOK_URL")
+FEISHU_WEBHOOK_URL = os.environ.get("FEISHU_WEBHOOK_URL")
 # =========================================================
 
 def get_beijing_time():
@@ -26,12 +28,12 @@ def get_beijing_time():
 # ---------------------------------------------------------
 def get_tavily_data():
     print("1. 正在全网搜索 (Tavily)...")
-    if not TAVILY_API_KEY or "在此粘贴" in TAVILY_API_KEY:
+    if not TAVILY_API_KEY:
         print("⚠️ Tavily Key 未配置，跳过")
         return []
     
     tavily = TavilyClient(api_key=TAVILY_API_KEY)
-    # 策略：增加 energy, infrastructure, arbitrage 等词，引导搜出基建和套利相关新闻
+    # 策略：增加 energy, infrastructure, arbitrage 等词
     query = "AI artificial intelligence breaking news energy crisis infrastructure arbitrage stock market business impact OpenAI DeepSeek"
     try:
         response = tavily.search(query=query, search_depth="advanced", max_results=25, days=1)
@@ -47,7 +49,7 @@ def get_tavily_data():
 # ---------------------------------------------------------
 def get_bocha_data():
     print("2. 正在尝试博查搜索 (Bocha)...")
-    if not BOCHA_API_KEY or "在此粘贴" in BOCHA_API_KEY:
+    if not BOCHA_API_KEY:
         print("⚠️ Bocha Key 未配置，跳过")
         return [] 
         
@@ -132,11 +134,11 @@ def get_realtime_news():
     return unique_news
 
 # ---------------------------------------------------------
-# 🧠 DeepSeek 思考与清洗 (Pro Max+ 深度拆解版)
+# 🧠 DeepSeek 思考与清洗 (深度解读版)
 # ---------------------------------------------------------
 def call_deepseek(prompt):
     print("3. 正在调用 DeepSeek V3 进行深度筛选与详细解读...")
-    if not DEEPSEEK_API_KEY or "在此粘贴" in DEEPSEEK_API_KEY:
+    if not DEEPSEEK_API_KEY:
         print("❌ DeepSeek Key 未配置")
         return None
 
@@ -147,11 +149,9 @@ def call_deepseek(prompt):
         "messages": [{"role": "user", "content": prompt}],
         "stream": False, 
         "temperature": 0.7, 
-        # 🔥 Token 拉满，防止回答被截断
         "max_tokens": 8000
     }
     try:
-        # 🔥 保持 180s 超时
         response = requests.post(url, headers=headers, json=payload, timeout=180)
         if response.status_code == 200:
             return response.json()['choices'][0]['message']['content']
@@ -168,7 +168,7 @@ def ai_process_content(news_data):
     beijing_date = get_beijing_time().strftime('%Y-%m-%d')
     data_str = json.dumps(news_data[:70], ensure_ascii=False)
 
-    # 🔥🔥 核心 Prompt 修改：要求“详细拆解”、“逻辑闭环”、“多路径建议” 🔥🔥
+    # 🔥🔥 核心 Prompt：保持你最满意的深度解读逻辑 🔥🔥
     prompt = f"""
     你是一名**极度务实、擅长深度剖析**的 AI 商业战略顾问。这里有 {len(news_data)} 条原始资讯。
     请撰写一份《AI 全球实战内参》，分为“资讯情报”和“深度研判”两部分。
@@ -236,9 +236,8 @@ def ai_process_content(news_data):
 # 📢 推送通道
 # ---------------------------------------------------------
 def push_wechat(content):
-    if not content or not WECOM_WEBHOOK_URL or "在此粘贴" in WECOM_WEBHOOK_URL: return
+    if not content or not WECOM_WEBHOOK_URL: return
     print("4.1 推送至企微...")
-    # 微信限制 4096 字节，分段推送
     if len(content.encode('utf-8')) > 4000:
         part1 = content[:3000] + "\n...(下接第二条)..."
         part2 = "...(接上条)...\n" + content[3000:]
@@ -248,7 +247,7 @@ def push_wechat(content):
         requests.post(WECOM_WEBHOOK_URL, json={"msgtype": "markdown", "markdown": {"content": content}})
 
 def push_feishu(content):
-    if not content or not FEISHU_WEBHOOK_URL or "在此粘贴" in FEISHU_WEBHOOK_URL: return
+    if not content or not FEISHU_WEBHOOK_URL: return
     print("4.2 推送至飞书...")
     current_time = get_beijing_time().strftime('%Y-%m-%d %H:%M')
     payload = {
@@ -267,11 +266,8 @@ def push_feishu(content):
     }
     requests.post(FEISHU_WEBHOOK_URL, json=payload)
 
-# ---------------------------------------------------------
-# 🚀 主程序入口
-# ---------------------------------------------------------
 if __name__ == "__main__":
-    print("🚀 启动 AI 情报系统 (深度解读版)...")
+    print("🚀 启动 AI 情报系统 (安全托管版)...")
     raw_data = get_realtime_news()
     if raw_data:
         final_text = ai_process_content(raw_data)
