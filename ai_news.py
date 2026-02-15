@@ -205,4 +205,81 @@ def ai_process_content(news_data):
     > 🧠 智能驱动：DeepSeek V3 | 🌍 覆盖信源：Tavily (国际) + Bocha (国内)
     
     #### ⭐ 顶级重磅 (Level S - 必读)
-    1.
+    1. **[标签] 标题**
+       🔗 [媒体名](url)
+       💡 **解读：** ...
+    ... (直到凑齐 20 条)
+
+    ---
+    #### 🔭 深度战略研判 (逻辑拆解版)
+    
+    **1. ⚡ 到底发生了什么？**
+    ...
+
+    **2. 💰 钱流向了哪里？ (详细拆解)**
+    * **硬钱（电力与基建）：** ... (解释为什么流向这里)
+    * **快钱（信息差与套利）：** ... (解释具体的操作逻辑)
+
+    **3. 👉 我们该怎么干？ (行动指南)**
+    * **路径 A (技术/职场)：** ...
+    * **路径 B (生意/副业)：** ...
+
+    **4. 🛑 终极总结：**
+    ...
+    
+    **原始数据投喂：**
+    {data_str}
+    """
+    return call_deepseek(prompt)
+
+# ---------------------------------------------------------
+# 📢 推送通道
+# ---------------------------------------------------------
+def push_wechat(content):
+    if not content or not WECOM_WEBHOOK_URL or "在此粘贴" in WECOM_WEBHOOK_URL: return
+    print("4.1 推送至企微...")
+    # 微信限制 4096 字节，分段推送
+    if len(content.encode('utf-8')) > 4000:
+        part1 = content[:3000] + "\n...(下接第二条)..."
+        part2 = "...(接上条)...\n" + content[3000:]
+        requests.post(WECOM_WEBHOOK_URL, json={"msgtype": "markdown", "markdown": {"content": part1}})
+        requests.post(WECOM_WEBHOOK_URL, json={"msgtype": "markdown", "markdown": {"content": part2}})
+    else:
+        requests.post(WECOM_WEBHOOK_URL, json={"msgtype": "markdown", "markdown": {"content": content}})
+
+def push_feishu(content):
+    if not content or not FEISHU_WEBHOOK_URL or "在此粘贴" in FEISHU_WEBHOOK_URL: return
+    print("4.2 推送至飞书...")
+    current_time = get_beijing_time().strftime('%Y-%m-%d %H:%M')
+    payload = {
+        "msg_type": "interactive",
+        "card": {
+            "config": {"wide_screen_mode": True},
+            "header": {
+                "template": "blue",
+                "title": {"content": "🚀 AI 全球实战内参", "tag": "plain_text"}
+            },
+            "elements": [
+                {"tag": "markdown", "content": content},
+                {"tag": "note", "elements": [{"tag": "plain_text", "content": f"更新: {current_time}"}]}
+            ]
+        }
+    }
+    requests.post(FEISHU_WEBHOOK_URL, json=payload)
+
+# ---------------------------------------------------------
+# 🚀 主程序入口
+# ---------------------------------------------------------
+if __name__ == "__main__":
+    print("🚀 启动 AI 情报系统 (深度解读版)...")
+    raw_data = get_realtime_news()
+    if raw_data:
+        final_text = ai_process_content(raw_data)
+        if final_text:
+            push_wechat(final_text)
+            push_feishu(final_text)
+            print("✅ 任务完成")
+        else:
+            print("⚠️ DeepSeek 生成为空")
+    else:
+        print("❌ 无数据")
