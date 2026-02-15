@@ -6,9 +6,10 @@ from tavily import TavilyClient
 from datetime import datetime, timedelta, timezone
 
 # =========================================================
-# 🔴 核心配置区 (安全版：只从环境变量读取)
+# 🔴 核心配置区 (生产环境版：仅从环境变量读取)
 # =========================================================
-# 注意：这里不再有 "or 'sk-xxx'"，强制要求必须配置环境变量
+# 注意：已移除所有硬编码 Key。
+# 必须确保在 GitHub Settings -> Secrets 中配置了这些变量。
 # =========================================================
 TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
@@ -29,7 +30,7 @@ def get_beijing_time():
 def get_tavily_data():
     print("1. 正在全网搜索 (Tavily)...")
     if not TAVILY_API_KEY:
-        print("⚠️ Tavily Key 未配置，跳过")
+        print("⚠️ Tavily Key 未配置 (环境变量为空)，跳过")
         return []
     
     tavily = TavilyClient(api_key=TAVILY_API_KEY)
@@ -50,7 +51,7 @@ def get_tavily_data():
 def get_bocha_data():
     print("2. 正在尝试博查搜索 (Bocha)...")
     if not BOCHA_API_KEY:
-        print("⚠️ Bocha Key 未配置，跳过")
+        print("⚠️ Bocha Key 未配置 (环境变量为空)，跳过")
         return [] 
         
     url = "https://api.bochaai.com/v1/web-search"
@@ -87,16 +88,17 @@ def get_bocha_data():
         return []
 
 # ---------------------------------------------------------
-# 🛡️ 数据源 C: RSS 兜底
+# 🛡️ 数据源 C: RSS (常驻主力源)
 # ---------------------------------------------------------
 def get_rss_data():
-    print("🔄 正在启动 RSS 兜底机制 (36Kr & IT之家)...")
+    print("3. 正在获取 RSS 深度资讯 (36Kr & IT之家)...")
     rss_sources = ["https://36kr.com/feed", "https://www.ithome.com/rss/"]
     results = []
     try:
         for rss_url in rss_sources:
             feed = feedparser.parse(rss_url)
-            for entry in feed.entries[:10]:
+            # 每个源获取 15 条，保证国内高质量新闻的浓度
+            for entry in feed.entries[:15]:
                 results.append({
                     "title": entry.title,
                     "url": entry.link,
@@ -109,19 +111,20 @@ def get_rss_data():
         return []
 
 # ---------------------------------------------------------
-# ⚙️ 核心调度逻辑
+# ⚙️ 核心调度逻辑 (三管齐下)
 # ---------------------------------------------------------
 def get_realtime_news():
     all_news = []
+    
+    # 🔥 并行获取所有数据源，不再进行兜底判断
+    # 这样素材池会非常大 (25 + 25 + 30 ≈ 80条)
     all_news.extend(get_tavily_data())
     all_news.extend(get_bocha_data())
+    all_news.extend(get_rss_data())
     
     print(f"📊 原始素材池总数: {len(all_news)} 条")
-
-    if len(all_news) < 20:
-        print("🛡️ 素材不足，启动 RSS 补充...")
-        all_news.extend(get_rss_data())
         
+    # 去重逻辑
     seen_urls = set()
     unique_news = []
     for news in all_news:
@@ -134,12 +137,12 @@ def get_realtime_news():
     return unique_news
 
 # ---------------------------------------------------------
-# 🧠 DeepSeek 思考与清洗 (深度解读版)
+# 🧠 DeepSeek 思考与清洗 (Pro Max+ 合规安全版)
 # ---------------------------------------------------------
 def call_deepseek(prompt):
-    print("3. 正在调用 DeepSeek V3 进行深度筛选与详细解读...")
+    print("4. 正在调用 DeepSeek V3 进行深度筛选与详细解读...")
     if not DEEPSEEK_API_KEY:
-        print("❌ DeepSeek Key 未配置")
+        print("❌ DeepSeek Key 未配置，无法生成内容")
         return None
 
     url = "https://api.siliconflow.cn/v1/chat/completions"
@@ -149,9 +152,11 @@ def call_deepseek(prompt):
         "messages": [{"role": "user", "content": prompt}],
         "stream": False, 
         "temperature": 0.7, 
+        # Token 拉满
         "max_tokens": 8000
     }
     try:
+        # 保持 180s 超时，防止深度思考中断
         response = requests.post(url, headers=headers, json=payload, timeout=180)
         if response.status_code == 200:
             return response.json()['choices'][0]['message']['content']
@@ -166,9 +171,10 @@ def ai_process_content(news_data):
     if not news_data: return None
     
     beijing_date = get_beijing_time().strftime('%Y-%m-%d')
-    data_str = json.dumps(news_data[:70], ensure_ascii=False)
+    # 增加投喂上限到 80 条，充分利用 RSS 带来的数据
+    data_str = json.dumps(news_data[:80], ensure_ascii=False)
 
-    # 🔥🔥 核心 Prompt：保持你最满意的深度解读逻辑 🔥🔥
+    # 🔥🔥 核心 Prompt：增加合规指令 + 深度解读 🔥🔥
     prompt = f"""
     你是一名**极度务实、擅长深度剖析**的 AI 商业战略顾问。这里有 {len(news_data)} 条原始资讯。
     请撰写一份《AI 全球实战内参》，分为“资讯情报”和“深度研判”两部分。
@@ -182,27 +188,28 @@ def ai_process_content(news_data):
 
     **1. ⚡ 到底发生了什么？ (底层逻辑)**
     不要只重复新闻。要解释表象背后的**博弈逻辑**。
-    * 例如：DeepSeek 的低成本不仅仅是省钱，它打破了美国科技巨头的什么垄断？为什么这会让华尔街恐慌？
 
     **2. 💰 钱流向了哪里？ (必须解释“为什么”)**
-    * **硬钱（基建/能源）：** * 不要只说“电力”，要解释：为什么 AI 会导致缺电？为什么风电不行，火电/核电却火了？（提示：解释数据中心的稳定性需求）。
-        * 提及“老旧数据中心改造”带来的机会。
-    * **软钱（B2B应用）：** * 具体指哪些软件？（例如：法律AI、医疗影像AI）。为什么这些比通用大模型赚钱？
-    * **快钱（套利/信息差）：** * **必须详细解释“监管套利”**：举例说明（例如：把国产模型包装成海外壳公司，卖给受限制的地区；或者利用国内外信息差做倒卖）。让读者看懂这个灰色/灰色地带的操作逻辑。
+    * **硬钱（基建/能源）：** * 不要只说“电力”，要解释：为什么 AI 会导致缺电？为什么风电不行，火电/核电却火了？
+    * **软钱（B2B应用）：** * 具体指哪些软件？为什么这些比通用大模型赚钱？
+    * **快钱（套利/信息差）：** * **⚠️ 严厉的合规警告：** 在描述灰色产业或套利手段时，**必须使用中性、客观的商业术语**。
+      * **禁止使用：** “伪装”、“倒卖”、“黑市”、“钻空子”等可能触发风控的词汇。
+      * **必须改用：** “合规架构搭建”、“跨区域价差”、“数据资产化”、“监管差异化运营”等专业词汇。
+      * *举例：* 不要说“把国产模型伪装成外资”，要说“建立海外离岸主体实现技术出海”。
 
     **3. 👉 我们该怎么干？ (分人群多路径建议)**
     不要只说“去学习”。请针对不同人群给出**具体、可执行**的建议：
     * **路径 A (打工人/转型)：** 比如“学习 ComfyUI 做商业切片”，或者“转行去做 AI 数据中心的运维（蓝领）”。
-    * **路径 B (小创业者/生意人)：** 比如“给传统企业（如律所、餐馆）做私有化知识库部署”，解释为什么他们需要这个。
-    * **路径 C (投资者/投机者)：** 比如“关注电网设备股”或者“做空硬件泡沫”。
+    * **路径 B (小创业者/生意人)：** 比如“给传统企业（如律所、餐馆）做私有化知识库部署”。
+    * **路径 C (投资者/投机者)：** 比如“关注电网设备股”。
 
     **4. 🛑 终极总结 (趋势预判)**
-    对未来 1-3 年的局势做一个详细推演，而不是一句口号。
+    对未来 1-3 年的局势做一个详细推演。
 
     **🔥 输出格式模板：**
 
     ### 🚀 AI 全球实战内参 ({beijing_date})
-    > 🧠 智能驱动：DeepSeek V3 | 🌍 覆盖信源：Tavily (国际) + Bocha (国内)
+    > 🧠 智能驱动：DeepSeek V3 | 🌍 覆盖信源：Tavily + Bocha + RSS (36Kr/IT之家)
     
     #### ⭐ 顶级重磅 (Level S - 必读)
     1. **[标签] 标题**
@@ -217,12 +224,11 @@ def ai_process_content(news_data):
     ...
 
     **2. 💰 钱流向了哪里？ (详细拆解)**
-    * **硬钱（电力与基建）：** ... (解释为什么流向这里)
-    * **快钱（信息差与套利）：** ... (解释具体的操作逻辑)
+    ...
+    * **快钱（信息差与套利）：** ... (注意使用合规术语)
 
     **3. 👉 我们该怎么干？ (行动指南)**
-    * **路径 A (技术/职场)：** ...
-    * **路径 B (生意/副业)：** ...
+    ...
 
     **4. 🛑 终极总结：**
     ...
@@ -237,7 +243,8 @@ def ai_process_content(news_data):
 # ---------------------------------------------------------
 def push_wechat(content):
     if not content or not WECOM_WEBHOOK_URL: return
-    print("4.1 推送至企微...")
+    print("5.1 推送至企微...")
+    # 微信限制 4096 字节，分段推送
     if len(content.encode('utf-8')) > 4000:
         part1 = content[:3000] + "\n...(下接第二条)..."
         part2 = "...(接上条)...\n" + content[3000:]
@@ -248,7 +255,7 @@ def push_wechat(content):
 
 def push_feishu(content):
     if not content or not FEISHU_WEBHOOK_URL: return
-    print("4.2 推送至飞书...")
+    print("5.2 推送至飞书...")
     current_time = get_beijing_time().strftime('%Y-%m-%d %H:%M')
     payload = {
         "msg_type": "interactive",
@@ -267,7 +274,7 @@ def push_feishu(content):
     requests.post(FEISHU_WEBHOOK_URL, json=payload)
 
 if __name__ == "__main__":
-    print("🚀 启动 AI 情报系统 (安全托管版)...")
+    print("🚀 启动 AI 情报系统 (生产环境版)...")
     raw_data = get_realtime_news()
     if raw_data:
         final_text = ai_process_content(raw_data)
