@@ -1,3 +1,5 @@
 requests
 tavily-python
 feedparser
+streamlit
+python-dotenv
