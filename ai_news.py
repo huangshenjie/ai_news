@@ -192,4 +192,76 @@ def ai_process_content(news_data, industry_focus="人工智能", report_title="A
     **原始数据投喂：**
     {data_str}
     """
+
     return call_deepseek(prompt)
+
+# =========================================================
+# 🚀 自动化推送模块 (专供 GitHub Actions 定时任务使用)
+# =========================================================
+
+def send_to_wecom(content):
+    print("5. 正在推送到企业微信...")
+    if not WECOM_WEBHOOK_URL:
+        print("⚠️ 未配置企业微信 Webhook，跳过")
+        return
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "msgtype": "markdown",
+        "markdown": {"content": content}
+    }
+    try:
+        requests.post(WECOM_WEBHOOK_URL, json=payload, headers=headers, timeout=10)
+        print("✅ 企业微信推送成功！")
+    except Exception as e:
+        print(f"❌ 企业微信推送失败: {e}")
+
+def send_to_feishu(content):
+    print("6. 正在推送到飞书...")
+    if not FEISHU_WEBHOOK_URL:
+        print("⚠️ 未配置飞书 Webhook，跳过")
+        return
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "msg_type": "interactive",
+        "card": {
+            "elements": [{
+                "tag": "markdown",
+                "content": content
+            }]
+        }
+    }
+    try:
+        requests.post(FEISHU_WEBHOOK_URL, json=payload, headers=headers, timeout=10)
+        print("✅ 飞书推送成功！")
+    except Exception as e:
+        print(f"❌ 飞书推送失败: {e}")
+
+# 当脚本被直接运行（比如被 GitHub Actions 触发）时，执行以下逻辑
+if __name__ == "__main__":
+    print("🕒 检测到自动化任务启动，开始执行每日例行抓取...")
+    
+    # ⚠️ 自动化任务没有前端让你选赛道，必须在这里写死一个你最想每天自动接收的赛道
+    # 这里默认设置为“AI人工智能”，如果你想每天自动推“跨境电商”，就把下面的词换掉
+    tavily_q = "AI startup funding open-source LLM AI infrastructure monetization generative AI"
+    bocha_q = "大模型商业化 算力 DeepSeek落地应用 AI变现 融资"
+    rss_sources = ["https://36kr.com/feed", "https://www.ithome.com/rss/"]
+    
+    industry = "人工智能"
+    title = "AI 商业套利与实战内参"
+
+    # 1. 抓取数据
+    raw_news = get_realtime_news(tavily_query=tavily_q, bocha_query=bocha_q, rss_urls=rss_sources)
+    
+    if raw_news:
+        # 2. AI 处理并强制生成套利专区
+        final_report = ai_process_content(raw_news, industry_focus=industry, report_title=title)
+        
+        if final_report:
+            # 3. 分发到内部群聊
+            send_to_wecom(final_report)
+            send_to_feishu(final_report)
+            print("🎉 每日自动化流程全部执行完毕！")
+        else:
+            print("❌ AI 报告生成失败，取消推送。")
+    else:
+        print("❌ 未抓取到有效数据，取消推送。")
