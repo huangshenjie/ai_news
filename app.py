@@ -216,3 +216,5 @@ if st.session_state.clicked_generate:
             
     else:
         st.markdown(report_content)
+
+
