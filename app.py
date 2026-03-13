@@ -36,36 +36,37 @@ INDUSTRY_CONFIG = {
 }
 
 # ==========================================
-# ✂️ 视觉欺骗引擎 (暴力坐标切割法)
+# ✂️ 视觉欺骗引擎 (全屏雷达锁定法)
 # ==========================================
+import re
+
 def truncate_news_for_ui(full_report):
     """
-    无视大模型的段落排版，直接寻找第 6 条和战略研判的物理坐标进行切割。
+    无视一切 Markdown 乱码排版，精确制导切割。
     """
-    # 1. 寻找第 6 条的起始坐标 (容错: 6. | 6、 | **6. | **6、)
+    # 1. 寻找第 6 条的起始坐标
     match_6 = re.search(r'\n\s*(\*\*6\.|6\.|6、|\*\*6、)', full_report)
     
-    # 2. 寻找第二部分(战略研判)的起始坐标 (容错: 二、 | 第二部分 | 🔭 | 深度战略研判)
-    match_part2 = re.search(r'\n\s*(### |## |# )?(二、|第二部分|🔭|深度战略研判)', full_report)
+    # 如果连第6条都没找到（大模型彻底失控），原样放行保命
+    if not match_6:
+        return full_report
+        
+    cut_start = match_6.start()
     
-    # 战术A：如果同时找到了第6条和第二部分，实施精准掏空
-    if match_6 and match_part2 and match_6.start() < match_part2.start():
-        cut_start = match_6.start()
-        cut_end = match_part2.start()
-        
-        interceptor = "\n\n> 🔒 **[权限限制] 第 6 至 20 条核心 S 级情报已折叠。**\n> *(完整 20 条每日首发未删减版，已推送至内部核心圈。)*\n\n"
-        
-        # 拼接：前 5 条 + 拦截话术 + 第二部分及后续所有内容
+    # 2. 在第 6 条之后的所有文本中，进行极其宽泛的“第二部分”雷达扫描
+    remainder = full_report[cut_start:]
+    # 只要换行后出现以下任何一个词，立刻锁定坐标
+    match_part2 = re.search(r'\n.*?(第二部分|战略研判|🔭|二、)', remainder)
+    
+    interceptor = "\n\n> 🔒 **[权限限制] 第 6 至 20 条核心 S 级情报已折叠。**\n> *(完整 20 条每日首发未删减版，仅限内部圈子查阅。)*\n\n"
+    
+    if match_part2:
+        # 战术A：成功在后面找到了战略研判模块，完美拼接！
+        cut_end = cut_start + match_part2.start()
         return full_report[:cut_start] + interceptor + full_report[cut_end:]
-    
-    # 战术B：大模型排版彻底崩盘（没找到第二部分），但找到了第6条，直接一刀切断
-    elif match_6:
-         cut_start = match_6.start()
-         interceptor = "\n\n> 🔒 **[权限限制] 第 6 至 20 条核心 S 级情报已折叠。**\n> *(底层排版解析异常，为保护核心算力，后续模块已全量隐藏。)*\n\n"
-         return full_report[:cut_start] + interceptor
-         
-    # 战术C：连数字6都没找到（大模型彻底失控），原样放行，确保网页不报错白屏
-    return full_report
+    else:
+        # 战术B：大模型真的没写第二部分（极低概率），硬截断
+        return full_report[:cut_start] + interceptor + "\n> ⚠️ (底层大模型排版异常，部分后续模块无法展示)"
 # ==========================================
 # 🛡️ 极简缓存大法 (每天每赛道只耗费一次算力)
 # ==========================================
@@ -158,4 +159,5 @@ if unlock_code == "0515":
                 st.error(f"❌ 系统发生严重错误: {str(e)}")
 elif unlock_code != "":
     st.error("❌ 邀请码错误或已失效！请返回抖音/小红书后台私信获取最新授权。")
+
 
