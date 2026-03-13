@@ -1,9 +1,15 @@
 import streamlit as st
 import os
+import re
 from dotenv import load_dotenv
+from datetime import datetime, timedelta, timezone
 
 load_dotenv()
 import ai_news 
+
+def get_beijing_time():
+    utc_now = datetime.now(timezone.utc)
+    return utc_now + timedelta(hours=8)
 
 # ==========================================
 # 🎯 赛道精细化配置字典
@@ -30,9 +36,56 @@ INDUSTRY_CONFIG = {
 }
 
 # ==========================================
-# 网页前端 UI 封装层
+# ✂️ 视觉欺骗引擎 (精准切除第 6-20 条)
+# ==========================================
+def truncate_news_for_ui(full_report):
+    # 按照 markdown 的标题切分报告块
+    parts = re.split(r'(###\s+)', full_report)
+    
+    if len(parts) >= 3:
+        # 遍历寻找包含“情报”或“内参”的第一部分内容块
+        for i in range(len(parts)):
+            if "一" in parts[i] or "情报" in parts[i] or "内参" in parts[i]:
+                news_part = parts[i]
+                # 正则捕捉第 6 条的开头 (精准保留前 5 条)
+                cut_match = re.search(r'\n\s*(\*\*6\.|6\.|6、|\*\*6、)', news_part)
+                if cut_match:
+                    truncated = news_part[:cut_match.start()]
+                    interceptor = "\n\n> 🔒 **[权限限制] 第 6 至 20 条核心 S 级情报已折叠。**\n> *(完整 20 条每日首发未删减版，仅限内部圈子查阅。)*\n\n"
+                    parts[i] = truncated + interceptor
+                break
+    
+    return "".join(parts)
+
+# ==========================================
+# 🛡️ 极简缓存大法 (每天每赛道只耗费一次算力)
+# ==========================================
+@st.cache_data(ttl=86400)
+def generate_cached_report(date_str, industry_key, config):
+    raw_data = ai_news.get_realtime_news(
+        tavily_query=config['tavily_q'],
+        bocha_query=config['bocha_q'],
+        rss_urls=config['rss_urls']
+    )
+    if not raw_data:
+        return None
+        
+    return ai_news.ai_process_content(
+        news_data=raw_data,
+        industry_focus=industry_key.split(" ")[1],
+        report_title=config['title']
+    )
+
+# ==========================================
+# 🚀 网页前端 UI 渲染层
 # ==========================================
 st.set_page_config(page_title="商业情报套利雷达", page_icon="💰", layout="centered")
+
+st.markdown("""
+<style>
+.qr-box { background-color: #121212; border: 2px solid #FF4B4B; border-radius: 12px; padding: 25px; text-align: center; margin-top: 40px; box-shadow: 0px 10px 30px rgba(0,0,0,0.8); }
+</style>
+""", unsafe_allow_html=True)
 
 st.title("💰 全球信息差与套利雷达")
 st.markdown("---")
@@ -45,45 +98,54 @@ st.markdown("""
 selected_industry = st.selectbox("请选择要深度挖掘的搞钱赛道：", list(INDUSTRY_CONFIG.keys()))
 current_config = INDUSTRY_CONFIG[selected_industry]
 
-st.info(f"已锁定赛道：**{selected_industry}**。系统将提取前 20 条核心情报，并生成对应套利方案与宏观研判。")
+st.info(f"已锁定赛道：**{selected_industry}**。系统将提取核心情报，并生成对应套利方案与宏观研判。")
 
+st.markdown("---")
 # ==========================================
 # 🛑 商业风控与私域引流锁
 # ==========================================
-st.markdown("---")
-# type="password" 会让输入的密码变成小黑点，更有高级感
 unlock_code = st.text_input("🔑 请输入内部邀请码解锁系统 (加主理人微信免费获取)：", type="password")
 
-# 只有密码输入正确，才会显示生成按钮并执行后续逻辑
 if unlock_code == "0515":
-    if st.button(f"⚡ 生成【{current_config['title']}】", type="primary", use_container_width=True):
-        with st.spinner(f'🕵️‍♂️ 正在穿透全网搜捕【{selected_industry}】情报并推演变现模型... (需约 3 分钟)'):
+    if st.button(f"⚡ 消耗算力，生成【{current_config['title']}】", type="primary", use_container_width=True):
+        today_str = get_beijing_time().strftime("%Y-%m-%d")
+        
+        with st.spinner(f'🕵️‍♂️ 正在穿透全网搜捕【{selected_industry}】情报并推演变现模型...'):
             try:
-                raw_data = ai_news.get_realtime_news(
-                    tavily_query=current_config['tavily_q'],
-                    bocha_query=current_config['bocha_q'],
-                    rss_urls=current_config['rss_urls']
-                )
+                # 触发底层全量抓取与缓存 (此时你的飞书收到全量 20 条)
+                full_report = generate_cached_report(today_str, selected_industry, current_config)
                 
-                if not raw_data:
-                    st.error("❌ 抓取失败，请检查网络或 API 额度。")
+                if full_report:
+                    st.success("✅ 全维研判报告生成完毕！")
+                    
+                    # ✂️ 启动正则截断：只保留前 5 条情报，后续部分完好无损
+                    display_report = truncate_news_for_ui(full_report)
+                    
+                    st.markdown("### 📊 最终变现与战略研判")
+                    st.markdown(display_report)
+                    
+                    # ==========================================
+                    # 🎯 底部强力逼单二维码
+                    # ==========================================
+                    st.markdown("""
+                    <div class="qr-box">
+                        <h3 style="color: #FF4B4B; margin-bottom: 5px;">⚠️ 想要解锁被折叠的 15 条 S 级情报？</h3>
+                        <p style="color: #AAAAAA; font-size: 15px; margin-bottom: 15px;">
+                            本页面为体验版，已开启算力保护限制。<br>
+                            扫描下方主理人微信，获取<b>今日无删减版情报 +《小白首单实操防坑手册》</b>。<br>
+                            <span style="color:#FF4B4B; font-weight:bold;">（内部社群每日仅限 50 个免费名额，满员即关）</span>
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    try:
+                        st.image("qr.png", width=220, use_column_width=False)
+                    except:
+                        st.error("⚠️ 未找到二维码图片，请将微信二维码命名为 qr.png 并放在代码目录下！")
+
                 else:
-                    st.toast(f"✅ 捕获 {len(raw_data)} 条底层素材！强制大模型启动套利逻辑...")
-                    
-                    final_report = ai_news.ai_process_content(
-                        news_data=raw_data,
-                        industry_focus=selected_industry.split(" ")[1],
-                        report_title=current_config['title']
-                    )
-                    
-                    if final_report:
-                        st.success("✅ 全维研判报告生成完毕！")
-                        st.markdown("### 📊 最终变现与战略研判")
-                        st.markdown(final_report)
-                    else:
-                        st.error("❌ DeepSeek 推演失败，请检查命令行报错。")
+                    st.error("❌ 抓取或推理失败，请检查网络或 API 额度。")
             except Exception as e:
                 st.error(f"❌ 系统发生严重错误: {str(e)}")
 elif unlock_code != "":
-    # 如果用户乱输密码，给出无情的报错和引导
     st.error("❌ 邀请码错误或已失效！请返回抖音/小红书后台私信获取最新授权。")
