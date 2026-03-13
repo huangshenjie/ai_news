@@ -139,4 +139,22 @@ elif unlock_code == "0515":
                     <div class="qr-box">
                         <h3 style="color: #FF4B4B; margin-bottom: 5px;">⚠️ 想要解锁被折叠的 15 条 S 级情报？</h3>
                         <p style="color: #AAAAAA; font-size: 15px; margin-bottom: 15px;">
-                            本页面为
+                            本页面为体验版，已开启算力保护限制。<br>
+                            扫描下方主理人微信，获取<b>今日无删减版情报 +《小白首单实操防坑手册》</b>。<br>
+                            <span style="color:#FF4B4B; font-weight:bold;">（内部社群每日仅限 50 个免费名额，满员即关）</span>
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    try:
+                        st.image("qr.png", width=220, use_column_width=False)
+                    except:
+                        st.error("⚠️ 未找到二维码图片，请将微信二维码命名为 qr.png 并放在代码目录下！")
+                else:
+                    st.error("❌ 抓取或推理失败，请检查网络或 API 额度。")
+            except Exception as e:
+                st.error(f"❌ 系统发生严重错误: {str(e)}")
+
+# 轨道 3：错误密码拦截
+elif unlock_code != "":
+    st.error("❌ 邀请码错误或已失效！请返回抖音/小红书后台私信获取最新授权。")
