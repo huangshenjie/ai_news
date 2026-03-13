@@ -91,14 +91,14 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("💰 全球信息差与套利雷达")
+st.title("💰 全球信息差与商业雷达")
 
 st.markdown("""
-**系统状态：** 🟢 跨端爬虫就绪 | 🔴 **【套利专区】+【战略研判】双擎全开** **接入信源：** 国际全网 (Tavily) + 国内垂类 (Bocha) + 核心媒资 (RSS)  
+**系统状态：** 🟢 跨端爬虫就绪 | 🔴 **【实战专区】+【战略研判】双擎全开** **接入信源：** 国际全网 (Tavily) + 国内垂类 (Bocha) + 核心媒资 (RSS)  
 **驱动引擎：** DeepSeek-V3 商业操盘手模式
 """)
 
-selected_industry = st.selectbox("请选择要深度挖掘的搞钱赛道：", list(INDUSTRY_CONFIG.keys()))
+selected_industry = st.selectbox("请选择要深度挖掘的商业赛道：", list(INDUSTRY_CONFIG.keys()))
 current_config = INDUSTRY_CONFIG[selected_industry]
 
 st.info(f"已锁定赛道：**{selected_industry}**。系统将提取核心情报，并生成对应套利方案与宏观研判。")
@@ -108,7 +108,7 @@ st.markdown("---")
 # ==========================================
 # 🛑 商业风控与私域引流锁 (双轨密码)
 # ==========================================
-unlock_code = st.text_input("🔑 请输入内部邀请码解锁系统 (加主理人微信免费获取)：", type="password")
+unlock_code = st.text_input("🔑 请输入内部邀请码解锁系统 (获取方式见主页)：", type="password")
 
 if unlock_code == "huangshenjie":
     st.warning("⚠️ 已进入主理人超级后台模式")
@@ -155,3 +155,4 @@ elif unlock_code == "0515":
 
 elif unlock_code != "":
     st.error("❌ 邀请码错误或已失效！请返回抖音/小红书后台私信获取最新授权。")
+
