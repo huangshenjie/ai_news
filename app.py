@@ -110,7 +110,6 @@ st.markdown("---")
 # ==========================================
 unlock_code = st.text_input("🔑 请输入内部邀请码解锁系统 (加主理人微信免费获取)：", type="password")
 
-# 轨道 1：主理人专属后门 (核爆缓存)
 if unlock_code == "huangshenjie":
     st.warning("⚠️ 已进入主理人超级后台模式")
     st.info("当前状态：准备执行系统级缓存清理。该操作将抹除今日所有赛道的旧抓取记录。")
@@ -118,7 +117,6 @@ if unlock_code == "huangshenjie":
         st.cache_data.clear()
         st.success("✅ 系统缓存已物理核爆！请清空密码框，换回粉丝邀请码进行测试。")
 
-# 轨道 2：前端粉丝转化漏斗 (正常业务)
 elif unlock_code == "0515":
     if st.button(f"⚡ 消耗算力，生成【{current_config['title']}】", type="primary", use_container_width=True):
         today_str = get_beijing_time().strftime("%Y-%m-%d")
@@ -155,6 +153,5 @@ elif unlock_code == "0515":
             except Exception as e:
                 st.error(f"❌ 系统发生严重错误: {str(e)}")
 
-# 轨道 3：错误密码拦截
 elif unlock_code != "":
     st.error("❌ 邀请码错误或已失效！请返回抖音/小红书后台私信获取最新授权。")
