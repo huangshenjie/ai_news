@@ -102,6 +102,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("💰 全球信息差与套利雷达")
+# 物理核爆缓存按钮 (侧边栏)
+if st.sidebar.button("💣 强制炸毁系统缓存 (修复排版乱码)"):
+    st.cache_data.clear()
+    st.rerun()
 st.markdown("---")
 
 st.markdown("""
@@ -163,6 +167,7 @@ if unlock_code == "0515":
                 st.error(f"❌ 系统发生严重错误: {str(e)}")
 elif unlock_code != "":
     st.error("❌ 邀请码错误或已失效！请返回抖音/小红书后台私信获取最新授权。")
+
 
 
 
