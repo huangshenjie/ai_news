@@ -38,30 +38,32 @@ INDUSTRY_CONFIG = {
 import re
 
 # ==========================================
-# ✂️ 视觉欺骗引擎 (逐行扫描防弹法)
+# ✂️ 视觉欺骗引擎 (暴力宽泛扫描法)
 # ==========================================
 def truncate_news_for_ui(full_report):
     """
-    无视大模型产生的一切排版幻觉。
-    逐行扫描：看到第6条拉下黑幕，看到第二/三部分重新亮灯。
+    无视大模型产生的一切排版幻觉和嵌套格式。
+    放宽匹配条件：只要行内出现关键词，立刻执行拦截或放行。
     """
     lines = full_report.split('\n')
     out_lines = []
     is_ignoring = False
     
     for line in lines:
-        # 1. 触发拦截开关：只要行首出现 6. (含各种变体)，立刻拉下黑幕
-        if not is_ignoring and re.match(r'^\s*(\*\*6\.|6\.|6、|\*\*6、)', line):
+        # 1. 触发拦截开关：寻找第6条。
+        # 容错：不论前面是空格、加粗星号还是井号，只要匹配到 6. 或 6、 立刻拉下黑幕
+        if not is_ignoring and re.search(r'(^|\s|\*|#)(6\.|6、)', line):
             is_ignoring = True
             out_lines.append("\n> 🔒 **[权限限制] 第 6 至 20 条核心 S 级情报已折叠。**")
             out_lines.append("> *(完整 20 条每日首发未删减版，仅限内部圈子查阅。)*\n")
             continue
         
-        # 2. 解除拦截开关：只要黑幕拉下期间，扫描到后续大模块的标题，立刻重新开门
+        # 2. 解除拦截开关：暴力踹门！
+        # 容错：在黑幕期间，只要这一行的前 20 个字符内，出现后续模块的任何核心词汇或 Emoji，立刻开门！
         if is_ignoring:
-            if re.match(r'^\s*(### |## |# )?(二、|第二部分|🔭|深度战略研判|三、|第三部分|💰)', line):
+            if re.search(r'^.{0,20}(第二部分|战略研判|二、|🔭|第三部分|搞钱专区|三、|💰)', line):
                 is_ignoring = False
-                out_lines.append(line) # 把这个大标题放行
+                out_lines.append(line) # 把这个大标题原样放行
             continue
         
         # 3. 正常放行状态：原样输出
@@ -161,6 +163,7 @@ if unlock_code == "0515":
                 st.error(f"❌ 系统发生严重错误: {str(e)}")
 elif unlock_code != "":
     st.error("❌ 邀请码错误或已失效！请返回抖音/小红书后台私信获取最新授权。")
+
 
 
 
