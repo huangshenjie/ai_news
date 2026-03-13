@@ -36,27 +36,36 @@ INDUSTRY_CONFIG = {
 }
 
 # ==========================================
-# ✂️ 视觉欺骗引擎 (精准切除第 6-20 条)
+# ✂️ 视觉欺骗引擎 (暴力坐标切割法)
 # ==========================================
 def truncate_news_for_ui(full_report):
-    # 按照 markdown 的标题切分报告块
-    parts = re.split(r'(###\s+)', full_report)
+    """
+    无视大模型的段落排版，直接寻找第 6 条和战略研判的物理坐标进行切割。
+    """
+    # 1. 寻找第 6 条的起始坐标 (容错: 6. | 6、 | **6. | **6、)
+    match_6 = re.search(r'\n\s*(\*\*6\.|6\.|6、|\*\*6、)', full_report)
     
-    if len(parts) >= 3:
-        # 遍历寻找包含“情报”或“内参”的第一部分内容块
-        for i in range(len(parts)):
-            if "一" in parts[i] or "情报" in parts[i] or "内参" in parts[i]:
-                news_part = parts[i]
-                # 正则捕捉第 6 条的开头 (精准保留前 5 条)
-                cut_match = re.search(r'\n\s*(\*\*6\.|6\.|6、|\*\*6、)', news_part)
-                if cut_match:
-                    truncated = news_part[:cut_match.start()]
-                    interceptor = "\n\n> 🔒 **[权限限制] 第 6 至 20 条核心 S 级情报已折叠。**\n> *(完整 20 条每日首发未删减版，仅限内部圈子查阅。)*\n\n"
-                    parts[i] = truncated + interceptor
-                break
+    # 2. 寻找第二部分(战略研判)的起始坐标 (容错: 二、 | 第二部分 | 🔭 | 深度战略研判)
+    match_part2 = re.search(r'\n\s*(### |## |# )?(二、|第二部分|🔭|深度战略研判)', full_report)
     
-    return "".join(parts)
-
+    # 战术A：如果同时找到了第6条和第二部分，实施精准掏空
+    if match_6 and match_part2 and match_6.start() < match_part2.start():
+        cut_start = match_6.start()
+        cut_end = match_part2.start()
+        
+        interceptor = "\n\n> 🔒 **[权限限制] 第 6 至 20 条核心 S 级情报已折叠。**\n> *(完整 20 条每日首发未删减版，已推送至内部核心圈。)*\n\n"
+        
+        # 拼接：前 5 条 + 拦截话术 + 第二部分及后续所有内容
+        return full_report[:cut_start] + interceptor + full_report[cut_end:]
+    
+    # 战术B：大模型排版彻底崩盘（没找到第二部分），但找到了第6条，直接一刀切断
+    elif match_6:
+         cut_start = match_6.start()
+         interceptor = "\n\n> 🔒 **[权限限制] 第 6 至 20 条核心 S 级情报已折叠。**\n> *(底层排版解析异常，为保护核心算力，后续模块已全量隐藏。)*\n\n"
+         return full_report[:cut_start] + interceptor
+         
+    # 战术C：连数字6都没找到（大模型彻底失控），原样放行，确保网页不报错白屏
+    return full_report
 # ==========================================
 # 🛡️ 极简缓存大法 (每天每赛道只耗费一次算力)
 # ==========================================
@@ -149,3 +158,4 @@ if unlock_code == "0515":
                 st.error(f"❌ 系统发生严重错误: {str(e)}")
 elif unlock_code != "":
     st.error("❌ 邀请码错误或已失效！请返回抖音/小红书后台私信获取最新授权。")
+
