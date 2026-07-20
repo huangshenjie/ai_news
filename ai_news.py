@@ -1,19 +1,17 @@
 import requests
 import json
-import os
+from config import (
+    TAVILY_API_KEY,
+    DEEPSEEK_API_KEY,
+    BOCHA_API_KEY,
+    FEISHU_WEBHOOK_URL,
+    WECOM_WEBHOOK_URL
+)
 import feedparser
 from tavily import TavilyClient
 from datetime import datetime, timedelta, timezone
 
-# =========================================================
-# 🔴 核心配置区
-# =========================================================
-TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
-BOCHA_API_KEY = os.environ.get("BOCHA_API_KEY")
 
-WECOM_WEBHOOK_URL = os.environ.get("WECOM_WEBHOOK_URL")
-FEISHU_WEBHOOK_URL = os.environ.get("FEISHU_WEBHOOK_URL")
 
 def get_beijing_time():
     utc_now = datetime.now(timezone.utc)

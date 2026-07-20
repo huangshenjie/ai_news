@@ -1,15 +1,15 @@
 import requests
 import json
 import os
+from config import (
+    TAVILY_API_KEY,
+    DEEPSEEK_API_KEY,
+    BOCHA_API_KEY
+)
 from tavily import TavilyClient
 from datetime import datetime, timezone, timedelta
 
-# =========================================================
-# 🔴 核心配置区
-# =========================================================
-TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY") or "在此粘贴Tavily_Key"
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY") or "在此粘贴DeepSeek_Key"
-BOCHA_API_KEY = os.environ.get("BOCHA_API_KEY") or "在此粘贴Bocha_Key"
+
 
 def get_beijing_time():
     utc_now = datetime.now(timezone.utc)
@@ -20,7 +20,7 @@ def get_beijing_time():
 # ---------------------------------------------------------
 def search_tavily(keyword):
     print("1. 正在启动国际引擎 (Tavily) 进行深度挖掘...")
-    if not TAVILY_API_KEY or "在此粘贴" in TAVILY_API_KEY:
+    if not TAVILY_API_KEY:
         print("⚠️ Tavily Key 未配置，跳过")
         return []
         
@@ -42,7 +42,7 @@ def search_tavily(keyword):
 # ---------------------------------------------------------
 def search_bocha(keyword):
     print("2. 正在启动国内引擎 (Bocha) 穿透微信生态...")
-    if not BOCHA_API_KEY or "在此粘贴" in BOCHA_API_KEY:
+    if not BOCHA_API_KEY:
         print("⚠️ Bocha Key 未配置，跳过")
         return [] 
         
@@ -85,7 +85,7 @@ def search_bocha(keyword):
 # ---------------------------------------------------------
 def analyze_cases_with_deepseek(news_data, search_topic):
     print("3. 正在将碎片数据送入 DeepSeek 进行商业逻辑重构...")
-    if not DEEPSEEK_API_KEY or "在此粘贴" in DEEPSEEK_API_KEY:
+    if not DEEPSEEK_API_KEY:
         return "❌ DeepSeek Key 未配置"
 
     url = "https://api.siliconflow.cn/v1/chat/completions"
