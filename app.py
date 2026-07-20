@@ -1,5 +1,10 @@
 import streamlit as st
 import os
+from config import (
+    APP_ACCESS_CODE,
+    ADMIN_ACCESS_CODE,
+    check_required_config
+)
 import re
 from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
@@ -84,7 +89,18 @@ def generate_cached_report(date_str, industry_key, config):
 # 🚀 网页前端 UI 渲染层
 # ==========================================
 st.set_page_config(page_title="商业情报套利雷达", page_icon="💰", layout="centered")
+try:
 
+    check_required_config()
+
+
+except Exception:
+
+    st.error(
+        "系统配置异常，请联系管理员"
+    )
+
+    st.stop()
 st.markdown("""
 <style>
 .qr-box { background-color: #121212; border: 2px solid #FF4B4B; border-radius: 12px; padding: 25px; text-align: center; margin-top: 40px; box-shadow: 0px 10px 30px rgba(0,0,0,0.8); }
@@ -110,14 +126,14 @@ st.markdown("---")
 # ==========================================
 unlock_code = st.text_input("🔑 请输入内部邀请码解锁系统 (获取方式见主页)：", type="password")
 
-if unlock_code == "huangshenjie":
+if unlock_code == ADMIN_ACCESS_CODE:
     st.warning("⚠️ 已进入主理人超级后台模式")
     st.info("当前状态：准备执行系统级缓存清理。该操作将抹除今日所有赛道的旧抓取记录。")
     if st.button("💣 强制炸毁系统缓存 (清空旧数据)", type="primary"):
         st.cache_data.clear()
         st.success("✅ 系统缓存已物理核爆！请清空密码框，换回粉丝邀请码进行测试。")
 
-elif unlock_code == "0515":
+elif unlock_code == APP_ACCESS_CODE:
     if st.button(f"⚡ 消耗算力，生成【{current_config['title']}】", type="primary", use_container_width=True):
         today_str = get_beijing_time().strftime("%Y-%m-%d")
         
