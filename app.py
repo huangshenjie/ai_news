@@ -148,4 +148,4 @@ elif unlock_code == APP_ACCESS_CODE:
                 )
 
 elif unlock_code != "":
-    st.error("❌ 邀邀请码错误，请检查输入内容。")
+    st.error("❌ 邀请码错误，请检查输入内容。")
