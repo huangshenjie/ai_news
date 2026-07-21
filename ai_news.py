@@ -114,7 +114,7 @@ def call_deepseek(prompt):
     url = "https://api.siliconflow.cn/v1/chat/completions"
     headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"}
     payload = {
-        "model": "deepseek-ai/DeepSeek-V4",
+        "model": "deepseek-ai/DeepSeek-V3",
         "messages": [{"role": "user", "content": prompt}],
         "stream": False, "temperature": 0.7, "max_tokens": 8000
     }

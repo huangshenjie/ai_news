@@ -1,6 +1,4 @@
 import streamlit as st
-import os
-import re
 
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
@@ -46,7 +44,7 @@ INDUSTRY_CONFIG = {
 }
 
 # ==========================================
-# 🛡️ 极简缓存大法 
+# 🛡️ 报告缓存模块
 # ==========================================
 @st.cache_data(ttl=86400)
 def generate_cached_report(date_str, industry_key, config):
@@ -108,27 +106,28 @@ st.markdown("""
 selected_industry = st.selectbox("请选择要深度挖掘的商业赛道：", list(INDUSTRY_CONFIG.keys()))
 current_config = INDUSTRY_CONFIG[selected_industry]
 
-st.info(f"已锁定赛道：**{selected_industry}**。系统将提取核心情报，并生成对应套利方案与宏观研判。")
+st.info(
+    f"已选择分析方向：**{selected_industry}**。系统将采集行业信息，并生成趋势分析与商业洞察报告。")
 
 st.markdown("---")
 
 # ==========================================
-# 🛑 商业风控与私域引流锁 (双轨密码)
+# 🛡️ 用户权限管理
 # ==========================================
-unlock_code = st.text_input("🔑 请输入内部邀请码解锁系统 (获取方式见主页)：", type="password")
+unlock_code = st.text_input("🔑  请输入访问邀请码：", type="password")
 
 if unlock_code == ADMIN_ACCESS_CODE:
-    st.warning("⚠️ 已进入主理人超级后台模式")
+    st.warning("⚠️ 已进入管理员模式")
     st.info("当前状态：准备执行系统级缓存清理。该操作将抹除今日所有赛道的旧抓取记录。")
-    if st.button("💣 强制炸毁系统缓存 (清空旧数据)", type="primary"):
+    if st.button("清理报告缓存", type="primary"):
         st.cache_data.clear()
-        st.success("✅ 系统缓存已物理核爆！请清空密码框，换回粉丝邀请码进行测试。")
+        st.success("✅ 报告缓存已清理，请清空密码框，换回邀请码进行测试。")
 
 elif unlock_code == APP_ACCESS_CODE:
     if st.button(f"⚡ 消耗算力，生成【{current_config['title']}】", type="primary", use_container_width=True):
         today_str = get_beijing_time().strftime("%Y-%m-%d")
         
-        with st.spinner(f'🕵️‍♂️ 正在穿透全网搜捕【{selected_industry}】情报并推演变现模型...'):
+        with st.spinner(f'🕵️‍♂️正在采集【{selected_industry}】行业信息，并生成智能分析报告...'):
             try:
                 full_report = generate_cached_report(today_str, selected_industry, current_config)
                 
@@ -136,30 +135,6 @@ elif unlock_code == APP_ACCESS_CODE:
                     st.success("✅ 全维研判报告生成完毕！")                    
                     st.markdown("### 📊 AI行业分析报告")
                     st.markdown(full_report)
-                    
-                    st.markdown("""
-                    <div class="qr-box">
-                        <h3 style="color: #FF4B4B; margin-bottom: 5px;">⚠️ 想要解锁被折叠的 15 条 S 级情报？</h3>
-                        <p style="color: #AAAAAA; font-size: 15px; margin-bottom: 15px;">
-                            本页面为体验版，已开启算力保护限制。<br>
-                            扫描下方主理人微信，获取<b>今日无删减版情报 +《小白首单实操防坑手册》</b>。<br>
-                            <span style="color:#FF4B4B; font-weight:bold;">（内部社群每日仅限 50 个免费名额，满员即关）</span>
-                        </p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    try:
-                        st.image(
-                            "qr.png",
-                            width=220,
-                            use_column_width=False
-                        )
-                    except Exception:
-                        logger.warning(
-                            "二维码图片 qr.png 加载失败",
-                            exc_info=True
-                        )
-                        st.error("⚠️ 未找到二维码图片，请将微信二维码命名为 qr.png 并放在代码目录下！")
                 else:
                     st.error("❌ 抓取或推理失败，请检查网络或 API 额度。")
             except Exception:
@@ -173,4 +148,4 @@ elif unlock_code == APP_ACCESS_CODE:
                 )
 
 elif unlock_code != "":
-    st.error("❌ 邀请码错误或已失效！请返回抖音/小红书后台私信获取最新授权。")
+    st.error("❌ 邀邀请码错误，请检查输入内容。")
