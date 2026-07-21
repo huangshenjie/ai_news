@@ -1,16 +1,21 @@
 import streamlit as st
 import os
+import re
+
+from datetime import datetime, timezone, timedelta
+from dotenv import load_dotenv
+
+load_dotenv()
+
+import ai_news
+
 from config import (
     APP_ACCESS_CODE,
     ADMIN_ACCESS_CODE,
     check_user_config
 )
-import re
-from dotenv import load_dotenv
-from datetime import datetime, timedelta, timezone
 
-load_dotenv()
-import ai_news 
+from utils.logger import logger
 
 def get_beijing_time():
     utc_now = datetime.now(timezone.utc)
@@ -95,7 +100,9 @@ try:
 
 
 except Exception:
-
+    logger.error(
+        "用户配置检查失败",
+        exc_info=True)
     st.error(
         "系统配置异常，请联系管理员"
     )
@@ -161,14 +168,28 @@ elif unlock_code == APP_ACCESS_CODE:
                     """, unsafe_allow_html=True)
                     
                     try:
-                        st.image("qr.png", width=220, use_column_width=False)
-                    except:
+                        st.image(
+                            "qr.png",
+                            width=220,
+                            use_column_width=False
+                        )
+                    except Exception:
+                        logger.warning(
+                            "二维码图片 qr.png 加载失败",
+                            exc_info=True
+                        )
                         st.error("⚠️ 未找到二维码图片，请将微信二维码命名为 qr.png 并放在代码目录下！")
                 else:
                     st.error("❌ 抓取或推理失败，请检查网络或 API 额度。")
-            except Exception as e:
-                st.error(f"❌ 系统发生严重错误: {str(e)}")
+            except Exception:
+                logger.error(
+                    "报告生成流程异常",
+                    exc_info=True
+                )
+
+                st.error(
+                    "❌ 系统发生严重错误，请稍后重试"
+                )
 
 elif unlock_code != "":
     st.error("❌ 邀请码错误或已失效！请返回抖音/小红书后台私信获取最新授权。")
-
