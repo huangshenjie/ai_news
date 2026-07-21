@@ -114,7 +114,7 @@ def call_deepseek(prompt):
     url = "https://api.siliconflow.cn/v1/chat/completions"
     headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"}
     payload = {
-        "model": "deepseek-ai/DeepSeek-V3",
+        "model": "deepseek-ai/DeepSeek-V4",
         "messages": [{"role": "user", "content": prompt}],
         "stream": False, "temperature": 0.7, "max_tokens": 8000
     }
@@ -151,7 +151,8 @@ def ai_process_content(news_data, industry_focus="人工智能", report_title="A
 
     第一部分：⭐ 核心情报内参 (强制写满 Top 20)
     * 提取最相关的 20 条情报。
-    * 格式： 编号. [标签] 标题 -> 🔗 [来源](url) -> 💡 解读： (一句话商业影响)。
+    * 格式： 编号. [标签] 标题 -> 🔗 [来源git add .
+    ](url) -> 💡 解读： (一句话商业影响)。
 
     第二部分：🔭 深度战略研判 (宏观大局)
     * 包含三个维度，必须有深度分析：1. ⚡ 到底发生了什么？ 2. 💰 钱流向了哪里？ 3. 👉 我们该怎么干？
@@ -170,7 +171,7 @@ def ai_process_content(news_data, industry_focus="人工智能", report_title="A
     🔥 输出格式模板 (必须严格按此格式输出)：
 
     ### 🚀 {report_title} ({beijing_date})
-    > 🧠 智能驱动：DeepSeek V3 | 🎯 聚焦赛道：{industry_focus}
+    > 🧠 智能驱动：DeepSeek 大模型  | 🎯 聚焦赛道：{industry_focus}
     
     #### ⭐ 一、 核心情报内参 (Top 20)
     1. [政策] 示例标题

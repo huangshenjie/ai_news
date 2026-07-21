@@ -46,32 +46,6 @@ INDUSTRY_CONFIG = {
 }
 
 # ==========================================
-# ✂️ 视觉欺骗引擎 (暴力宽泛扫描法)
-# ==========================================
-def truncate_news_for_ui(full_report):
-    lines = full_report.split('\n')
-    out_lines = []
-    is_ignoring = False
-    
-    for line in lines:
-        if not is_ignoring and re.search(r'(^|\s|\*|#)(6\.|6、)', line):
-            is_ignoring = True
-            out_lines.append("\n> 🔒 **[权限限制] 第 6 至 20 条核心 S 级情报已折叠。**")
-            out_lines.append("> *(完整 20 条每日首发未删减版，仅限内部圈子查阅。)*\n")
-            continue
-        
-        if is_ignoring:
-            if re.search(r'^.{0,20}(第二部分|战略研判|二、|🔭|第三部分|搞钱专区|三、|💰)', line):
-                is_ignoring = False
-                out_lines.append(line)
-            continue
-        
-        if not is_ignoring:
-            out_lines.append(line)
-            
-    return '\n'.join(out_lines)
-
-# ==========================================
 # 🛡️ 极简缓存大法 
 # ==========================================
 @st.cache_data(ttl=86400)
@@ -128,7 +102,7 @@ st.markdown("""
             **数据来源：**
             Tavily + Bocha + RSS
             **AI分析引擎：**
-            DeepSeek-V4"""
+            DeepSeek大模型"""
             )
 
 selected_industry = st.selectbox("请选择要深度挖掘的商业赛道：", list(INDUSTRY_CONFIG.keys()))
@@ -159,12 +133,9 @@ elif unlock_code == APP_ACCESS_CODE:
                 full_report = generate_cached_report(today_str, selected_industry, current_config)
                 
                 if full_report:
-                    st.success("✅ 全维研判报告生成完毕！")
-                    
-                    display_report = truncate_news_for_ui(full_report)
-                    
-                    st.markdown("### 📊 最终变现与战略研判")
-                    st.markdown(display_report)
+                    st.success("✅ 全维研判报告生成完毕！")                    
+                    st.markdown("### 📊 AI行业分析报告")
+                    st.markdown(full_report)
                     
                     st.markdown("""
                     <div class="qr-box">
