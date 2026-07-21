@@ -268,7 +268,7 @@ if __name__ == "__main__":
     bocha_q = "大模型商业化 算力 DeepSeek落地应用 AI变现 避坑"
     rss_sources = ["https://36kr.com/feed", "https://www.ithome.com/rss/"]
     industry = "人工智能"
-    title = "AI 散户搞钱与避坑内参"
+    title = "AI行业趋势与商业洞察报告"
 
     raw_news = get_realtime_news(tavily_query=tavily_q, bocha_query=bocha_q, rss_urls=rss_sources)
     if raw_news:

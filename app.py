@@ -28,19 +28,19 @@ INDUSTRY_CONFIG = {
     "🤖 人工智能与大模型": {
         "tavily_q": "AI startup funding open-source LLM AI infrastructure monetization generative AI",
         "bocha_q": "大模型商业化 算力 DeepSeek落地应用 AI变现 融资",
-        "title": "AI 商业套利与实战内参",
+        "title": "AI行业趋势分析报告",
         "rss_urls": ["https://36kr.com/feed", "https://www.ithome.com/rss/"]
     },
-    "📱 自媒体与流量变现": {
+    "📱 自媒体内容生态与创作者经济": {
         "tavily_q": "Creator economy TikTok algorithm update YouTube monetization social media growth hacking",
         "bocha_q": "抖音算法调整 小红书带货 视频号变现 短视频矩阵玩法 直播切片 创作者经济",
-        "title": "自媒体流量套利实战内参",
+        "title": "自媒体内容生态趋势分析报告",
         "rss_urls": ["https://36kr.com/feed"] 
     },
-    "🛒 跨境电商与出海": {
+    "🛒 跨境电商与全球市场": {
         "tavily_q": "Cross-border e-commerce policy US tariffs Amazon seller updates TikTok Shop global trade",
         "bocha_q": "亚马逊封号 TikTok Shop美区政策 独立站引流 Temu卖家 关税 物流",
-        "title": "跨境电商出海搞钱内参",
+        "title": "跨境市场趋势分析报告",
         "rss_urls": ["https://36kr.com/feed"] 
     }
 }
@@ -93,7 +93,7 @@ def generate_cached_report(date_str, industry_key, config):
 # ==========================================
 # 🚀 网页前端 UI 渲染层
 # ==========================================
-st.set_page_config(page_title="商业情报套利雷达", page_icon="💰", layout="centered")
+st.set_page_config(page_title="AI商业情报雷达", page_icon="🤖", layout="centered")
 try:
 
     check_user_config()
@@ -114,12 +114,22 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("💰 全球信息差与商业雷达")
+st.title("🤖 AI商业情报雷达")
+st.caption(
+    "基于大语言模型的行业趋势分析与商业洞察平台"
+)
 
 st.markdown("""
-**系统状态：** 🟢 跨端爬虫就绪 | 🔴 **【实战专区】+【战略研判】双擎全开** **接入信源：** 国际全网 (Tavily) + 国内垂类 (Bocha) + 核心媒资 (RSS)  
-**驱动引擎：** DeepSeek-V3 商业操盘手模式
-""")
+            **系统能力：**
+            🟢 多源信息采集
+            🟢 数据清洗与结构化处理
+            🟢 大模型智能分析
+            🟢 自动化报告生成
+            **数据来源：**
+            Tavily + Bocha + RSS
+            **AI分析引擎：**
+            DeepSeek-V4"""
+            )
 
 selected_industry = st.selectbox("请选择要深度挖掘的商业赛道：", list(INDUSTRY_CONFIG.keys()))
 current_config = INDUSTRY_CONFIG[selected_industry]
