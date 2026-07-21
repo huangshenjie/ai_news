@@ -7,6 +7,7 @@ from config import (
     FEISHU_WEBHOOK_URL,
     WECOM_WEBHOOK_URL
 )
+from utils.logger import logger
 import feedparser
 from tavily import TavilyClient
 from datetime import datetime, timedelta, timezone
@@ -21,24 +22,27 @@ def get_beijing_time():
 # 🌍 数据源 A: Tavily
 # ---------------------------------------------------------
 def get_tavily_data(query=None):
-    print("1. 正在全网搜索 (Tavily)...")
+    logger.info("正在全网搜索 (Tavily)")
     if not TAVILY_API_KEY: return []
     if not query: query = "AI artificial intelligence breaking news"
     tavily = TavilyClient(api_key=TAVILY_API_KEY)
     try:
         response = tavily.search(query=query, search_depth="advanced", max_results=25, days=1)
         results = response.get('results', [])
-        print(f"✅ Tavily 获取成功: {len(results)} 条")
+        logger.info(f"Tavily 获取成功: {len(results)} 条")
         return results
-    except Exception as e:
-        print(f"❌ Tavily 搜索失败: {e}")
+    except Exception:
+        logger.error(
+            "Tavily 搜索失败",
+            exc_info=True
+        )
         return []
 
 # ---------------------------------------------------------
 # 🇨🇳 数据源 B: 博查 Bocha
 # ---------------------------------------------------------
 def get_bocha_data(query=None):
-    print("2. 正在尝试博查搜索 (Bocha)...")
+    logger.info("正在尝试博查搜索 (Bocha)...")
     if not BOCHA_API_KEY: return [] 
     if not query: query = "AI大模型 商业化 落地应用"
     url = "https://api.bochaai.com/v1/web-search"
@@ -54,16 +58,21 @@ def get_bocha_data(query=None):
             for item in items_list:
                 if len(item.get('name', '')) > 6:
                     results.append({"title": item.get('name'), "url": item.get('url'), "content": item.get('snippet')})
-            print(f"✅ Bocha 获取成功: {len(results)} 条")
+            logger.info(f"✅ Bocha 获取成功: {len(results)} 条")
             return results
         return []
-    except Exception: return []
+    except Exception:
+        logger.error(
+            "Bocha 搜索失败",
+            exc_info=True
+        )
+        return []
 
 # ---------------------------------------------------------
 # 🛡️ 数据源 C: RSS
 # ---------------------------------------------------------
 def get_rss_data(rss_sources=None):
-    print("3. 正在获取 RSS 深度资讯...")
+    logger.info("正在获取 RSS 深度资讯...")
     if not rss_sources:
         rss_sources = ["https://36kr.com/feed", "https://www.ithome.com/rss/"]
     results = []
@@ -72,9 +81,14 @@ def get_rss_data(rss_sources=None):
             feed = feedparser.parse(rss_url)
             for entry in feed.entries[:15]:
                 results.append({"title": entry.title, "url": entry.link, "content": entry.summary[:200] if hasattr(entry, 'summary') else entry.title})
-        print(f"✅ RSS 获取成功: {len(results)} 条")
+        logger.info(f"✅ RSS 获取成功: {len(results)} 条")
         return results
-    except Exception: return []
+    except Exception:
+        logger.error(
+            "RSS 获取失败",
+            exc_info=True
+        )
+        return []
 
 def get_realtime_news(tavily_query=None, bocha_query=None, rss_urls=None):
     all_news = []
@@ -88,14 +102,14 @@ def get_realtime_news(tavily_query=None, bocha_query=None, rss_urls=None):
         if url and url not in seen_urls:
             unique_news.append(news)
             seen_urls.add(url)
-    print(f"✅ 去重后待处理素材: {len(unique_news)} 条")
+    logger.info(f"✅ 去重后待处理素材: {len(unique_news)} 条")
     return unique_news
 
 # ---------------------------------------------------------
 # 🧠 DeepSeek 思考与清洗 (增加绝对物理锁死禁令)
 # ---------------------------------------------------------
 def call_deepseek(prompt):
-    print("4. 正在调用 DeepSeek 进行四大模块深度推演...")
+    logger.info("4. 正在调用 DeepSeek 进行四大模块深度推演...")
     if not DEEPSEEK_API_KEY: return None
     url = "https://api.siliconflow.cn/v1/chat/completions"
     headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"}
@@ -107,8 +121,18 @@ def call_deepseek(prompt):
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=240)
         if response.status_code == 200: return response.json()['choices'][0]['message']['content']
-        else: return None
-    except Exception: return None
+        else:
+            logger.error(
+                f"DeepSeek返回异常状态码: {response.status_code}"
+                f"响应: {response.text[:200]}"
+                )
+            return None
+    except Exception:
+        logger.error(
+            "DeepSeek 调用失败",
+            exc_info=True
+        )
+        return None
 
 def ai_process_content(news_data, industry_focus="人工智能", report_title="AI 全球实战内参"):
     if not news_data: return None
@@ -205,19 +229,22 @@ def ai_process_content(news_data, industry_focus="人工智能", report_title="A
 # =========================================================
 
 def send_to_wecom(content):
-    print("5. 正在推送到企业微信...")
+    logger.info("5. 正在推送到企业微信...")
     if not WECOM_WEBHOOK_URL:
         return
     headers = {"Content-Type": "application/json"}
     payload = {"msgtype": "markdown", "markdown": {"content": content}}
     try:
         requests.post(WECOM_WEBHOOK_URL, json=payload, headers=headers, timeout=10)
-        print("✅ 企业微信推送成功！")
-    except Exception as e:
-        print(f"❌ 企业微信推送失败: {e}")
+        logger.info("✅ 企业微信推送成功！")
+    except Exception:
+            logger.error(
+                "企业微信推送失败",
+                exc_info=True
+            )
 
 def send_to_feishu(content):
-    print("6. 正在推送到飞书...")
+    logger.info("6. 正在推送到飞书...")
     if not FEISHU_WEBHOOK_URL:
         return
     headers = {"Content-Type": "application/json"}
@@ -229,12 +256,14 @@ def send_to_feishu(content):
     }
     try:
         requests.post(FEISHU_WEBHOOK_URL, json=payload, headers=headers, timeout=10)
-        print("✅ 飞书推送成功！")
-    except Exception as e:
-        print(f"❌ 飞书推送失败: {e}")
+        logger.info("✅ 飞书推送成功！")
+    except Exception:
+            logger.error("飞书推送失败",
+                         exc_info=True
+            )
 
 if __name__ == "__main__":
-    print("🕒 检测到自动化任务启动，开始执行每日例行抓取...")
+    logger.info("🕒 检测到自动化任务启动，开始执行每日例行抓取...")
     tavily_q = "AI startup funding open-source LLM AI infrastructure monetization generative AI"
     bocha_q = "大模型商业化 算力 DeepSeek落地应用 AI变现 避坑"
     rss_sources = ["https://36kr.com/feed", "https://www.ithome.com/rss/"]
@@ -247,8 +276,8 @@ if __name__ == "__main__":
         if final_report:
             send_to_wecom(final_report)
             send_to_feishu(final_report)
-            print("🎉 每日自动化流程全部执行完毕！")
+            logger.info("🎉 每日自动化流程全部执行完毕！")
         else:
-            print("❌ AI 报告生成失败，取消推送。")
+            logger.error("❌ AI 报告生成失败，取消推送。")
     else:
-        print("❌ 未抓取到有效数据，取消推送。")
+        logger.error("❌ 未抓取到有效数据，取消推送。")
