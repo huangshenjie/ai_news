@@ -2,116 +2,178 @@
 AI商业资讯雷达
 统一配置管理模块
 
-所有敏感配置：
-- API Key
-- Webhook
-- 用户权限密码
+配置来源：
 
-统一从环境变量读取
+线上:
+Streamlit Secrets
+
+本地:
+.env
 """
+
 
 import os
 from dotenv import load_dotenv
 
+try:
+    import streamlit as st
+except ImportError:
+    st = None
 
-# 本地开发读取.env
+
 load_dotenv()
 
 
+
+def get_config(name):
+    """
+    优先读取 Streamlit Secrets
+    其次读取环境变量
+    """
+
+    # Streamlit Cloud
+    if st is not None:
+
+        try:
+            if name in st.secrets:
+                return st.secrets[name]
+
+        except Exception:
+            pass
+
+
+    # 本地环境
+    return os.getenv(name)
+
+
+
 # =========================
-# 用户权限配置
+# 用户权限
 # =========================
 
 
-APP_ACCESS_CODE = os.getenv(
+APP_ACCESS_CODE = get_config(
     "APP_ACCESS_CODE"
 )
 
 
-ADMIN_ACCESS_CODE = os.getenv(
+ADMIN_ACCESS_CODE = get_config(
     "ADMIN_ACCESS_CODE"
 )
 
 
 
 # =========================
-# AI服务配置
+# AI服务
 # =========================
 
 
-TAVILY_API_KEY = os.getenv(
+TAVILY_API_KEY = get_config(
     "TAVILY_API_KEY"
 )
 
 
-DEEPSEEK_API_KEY = os.getenv(
+DEEPSEEK_API_KEY = get_config(
     "DEEPSEEK_API_KEY"
 )
 
 
-BOCHA_API_KEY = os.getenv(
+BOCHA_API_KEY = get_config(
     "BOCHA_API_KEY"
 )
 
 
 
 # =========================
-# 消息推送
+# Webhook
 # =========================
 
 
-FEISHU_WEBHOOK_URL = os.getenv(
+FEISHU_WEBHOOK_URL = get_config(
     "FEISHU_WEBHOOK_URL"
 )
 
 
-WECOM_WEBHOOK_URL = os.getenv(
+WECOM_WEBHOOK_URL = get_config(
     "WECOM_WEBHOOK_URL"
 )
 
 
 
-def check_required_config():
+def check_user_config():
 
     """
-    检查核心配置是否存在
+    网站启动检查
     """
-
-    required = {
-
-        "APP_ACCESS_CODE":
-            APP_ACCESS_CODE,
-
-        "ADMIN_ACCESS_CODE":
-            ADMIN_ACCESS_CODE,
-
-        "TAVILY_API_KEY":
-            TAVILY_API_KEY,
-
-        "DEEPSEEK_API_KEY":
-            DEEPSEEK_API_KEY,
-
-        "BOCHA_API_KEY":
-            BOCHA_API_KEY
-
-    }
-
 
     missing=[]
 
 
-    for name,value in required.items():
+    configs={
 
-        if not value:
+        "APP_ACCESS_CODE":
+        APP_ACCESS_CODE,
 
-            missing.append(name)
+
+        "ADMIN_ACCESS_CODE":
+        ADMIN_ACCESS_CODE
+
+    }
+
+
+    for k,v in configs.items():
+
+        if not v:
+            missing.append(k)
 
 
 
     if missing:
 
         raise RuntimeError(
-            "缺少系统配置:"
+            "缺少用户权限配置:"
+            +
+            ",".join(missing)
+        )
+
+
+
+def check_ai_config():
+
+    """
+    AI任务运行检查
+    """
+
+    missing=[]
+
+
+    configs={
+
+        "TAVILY_API_KEY":
+        TAVILY_API_KEY,
+
+
+        "DEEPSEEK_API_KEY":
+        DEEPSEEK_API_KEY,
+
+
+        "BOCHA_API_KEY":
+        BOCHA_API_KEY
+
+    }
+
+
+    for k,v in configs.items():
+
+        if not v:
+            missing.append(k)
+
+
+
+    if missing:
+
+        raise RuntimeError(
+            "缺少AI服务配置:"
             +
             ",".join(missing)
         )
