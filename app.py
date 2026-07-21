@@ -3,7 +3,7 @@ import os
 from config import (
     APP_ACCESS_CODE,
     ADMIN_ACCESS_CODE,
-    check_required_config
+    check_user_config
 )
 import re
 from dotenv import load_dotenv
@@ -91,7 +91,7 @@ def generate_cached_report(date_str, industry_key, config):
 st.set_page_config(page_title="商业情报套利雷达", page_icon="💰", layout="centered")
 try:
 
-    check_required_config()
+    check_user_config()
 
 
 except Exception:
