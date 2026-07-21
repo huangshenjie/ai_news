@@ -1,15 +1,16 @@
-import requests
 import json
-import os
+import requests
+from datetime import datetime, timezone, timedelta
+
+from tavily import TavilyClient
+
 from config import (
     TAVILY_API_KEY,
     DEEPSEEK_API_KEY,
     BOCHA_API_KEY
 )
-from tavily import TavilyClient
-from datetime import datetime, timezone, timedelta
 
-
+from utils.logger import logger
 
 def get_beijing_time():
     utc_now = datetime.now(timezone.utc)
@@ -19,9 +20,13 @@ def get_beijing_time():
 # 🌍 深度搜索源 A: Tavily (取消时间限制，进行历史深度挖掘)
 # ---------------------------------------------------------
 def search_tavily(keyword):
-    print("1. 正在启动国际引擎 (Tavily) 进行深度挖掘...")
+    logger.info(
+        "正在启动国际引擎 (Tavily) 进行深度挖掘"
+    )
     if not TAVILY_API_KEY:
-        print("⚠️ Tavily Key 未配置，跳过")
+        logger.warning(
+            "Tavily Key 未配置，跳过"
+        )
         return []
         
     tavily = TavilyClient(api_key=TAVILY_API_KEY)
@@ -31,19 +36,24 @@ def search_tavily(keyword):
         # 注意：删除了 days=1 参数，获取全局历史数据
         response = tavily.search(query=query, search_depth="advanced", max_results=15)
         results = response.get('results', [])
-        print(f"✅ Tavily 挖掘成功: {len(results)} 条碎片")
+        logger.info(
+            f"Tavily 挖掘成功: {len(results)} 条碎片"
+        )
         return results
-    except Exception as e:
-        print(f"❌ Tavily 搜索失败: {e}")
+    except Exception:
+        logger.error(
+            "Tavily 搜索失败",
+            exc_info=True
+        )
         return []
 
 # ---------------------------------------------------------
 # 🇨🇳 深度搜索源 B: 博查 Bocha (取消时间限制，深挖国内闭环生态)
 # ---------------------------------------------------------
 def search_bocha(keyword):
-    print("2. 正在启动国内引擎 (Bocha) 穿透微信生态...")
+    logger.info("正在启动国内引擎 (Bocha) 穿透微信生态...")
     if not BOCHA_API_KEY:
-        print("⚠️ Bocha Key 未配置，跳过")
+        logger.warning("Bocha Key 未配置，跳过")
         return [] 
         
     url = "https://api.bochaai.com/v1/web-search"
@@ -71,22 +81,31 @@ def search_bocha(keyword):
                     "url": item.get('url'),
                     "content": item.get('snippet')
                 })
-            print(f"✅ Bocha 挖掘成功: {len(results)} 条碎片")
+            logger.info(
+                f"Bocha 挖掘成功: {len(results)} 条碎片"
+            )
             return results
         else:
-            print(f"❌ Bocha API 错误: {response.status_code}")
+            logger.error(
+                f"Bocha API 请求失败，状态码: {response.status_code}"
+            )
             return []
-    except Exception as e:
-        print(f"❌ Bocha 请求异常: {e}")
+    except Exception:
+        logger.error(
+            "Bocha 请求异常",
+            exc_info=True
+        )
         return []
 
 # ---------------------------------------------------------
 # 🧠 DeepSeek 商业大脑：强制表格化输出
 # ---------------------------------------------------------
 def analyze_cases_with_deepseek(news_data, search_topic):
-    print("3. 正在将碎片数据送入 DeepSeek 进行商业逻辑重构...")
+    logger.info("正在将碎片数据送入 DeepSeek 进行商业逻辑重构...")
     if not DEEPSEEK_API_KEY:
-        return "❌ DeepSeek Key 未配置"
+        logger.warning("DeepSeek Key 未配置，跳过分析"
+        )
+        return None
 
     url = "https://api.siliconflow.cn/v1/chat/completions"
     headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"}
@@ -124,9 +143,15 @@ def analyze_cases_with_deepseek(news_data, search_topic):
         if response.status_code == 200:
             return response.json()['choices'][0]['message']['content']
         else:
+            logger.error(
+                f"DeepSeek返回异常状态码: {response.status_code}"
+            )
             return None
-    except Exception as e:
-        print(f"❌ 商业大脑运算异常: {e}")
+    except Exception:
+        logger.error(
+            "商业大脑运算异常",
+            exc_info=True
+        )
         return None
 
 # ---------------------------------------------------------
@@ -140,20 +165,24 @@ def save_to_markdown(content, topic):
             f.write(f"# 🔍 商业案例深度挖掘报告：{topic}\n\n")
             f.write(f"> 生成时间：{get_beijing_time().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
             f.write(content)
-        print(f"\n🎉 完美收工！多维表格已成功保存至本地文件: 【{filename}】")
-        print("💡 提示：你可以直接用 Excel 或 Notion 导入此 md 文件，完美呈现表格格式。")
-    except Exception as e:
-        print(f"❌ 保存文件失败: {e}")
+        logger.info(
+            f"Markdown报告保存成功: {filename}"
+        )
+    except Exception:
+        logger.error(
+            "保存文件失败",
+            exc_info=True
+        )
 
 # ---------------------------------------------------------
 # 🚀 挖掘机主程序
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    print("🚀 启动 [一人公司商业挖掘机]...")
+    logger.info("🚀 启动 [一人公司商业挖掘机]...")
     
     # 你可以每次运行前修改这个关键词，定向挖掘不同领域的案例
     target_topic = "AI 知识库 自动化工作流"
-    print(f"🎯 本次锁定的挖掘目标：【{target_topic}】\n")
+    logger.info(f"🎯 本次锁定的挖掘目标：【{target_topic}】\n")
 
     # 1. 联合收集数据
     raw_data = []
@@ -161,7 +190,7 @@ if __name__ == "__main__":
     raw_data.extend(search_bocha(target_topic))
     
     if raw_data:
-        print(f"总计获取素材: {len(raw_data)} 条，开始清洗去重...")
+        logger.info(f"总计获取素材: {len(raw_data)} 条，开始清洗去重...")
         # 简单去重
         unique_data = {item['url']: item for item in raw_data if item.get('url')}.values()
         
@@ -178,6 +207,10 @@ if __name__ == "__main__":
             # 3. 自动生成文件
             save_to_markdown(final_table, target_topic.replace(" ", "_"))
         else:
-            print("⚠️ 商业大脑未能产出有效结果。")
+            logger.warning(
+                " 商业大脑未能产出有效结果。"
+            )
     else:
-        print("❌ 目标领域太冷门或 API 额度耗尽，未挖到任何数据。")
+        logger.error(
+            "目标领域太冷门或 API 额度耗尽，未挖到任何数据。"
+        )
